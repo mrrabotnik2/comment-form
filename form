@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comment Form</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script>
+    const supabaseUrl = 'https://YOUR_SUPABASE_URL';
+    const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
+    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+    const form = document.getElementById('commentForm');
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const name = document.getElementById('name').value || 'Anonymous';
+        const comment = document.getElementById('comment').value;
+
+        try {
+            const { data, error } = await supabase
+                .from('comments')
+                .insert([{ name: name, comment: comment }]);
+
+            if (error) throw error;
+
+            document.getElementById('successMessage').style.display = 'block';
+            form.reset();
+        } catch (error) {
+            console.error(error);
+            document.getElementById('errorMessage').style.display = 'block';
+        }
+    });
+  </script>
+</head>
+<body>
+  <form id="commentForm">
+    <label for="name">Name:</label>
+    <input type="text" id="name" name="name" placeholder="Your name" style="width: 100%; margin-bottom: 10px; padding: 8px;">
+    <label for="comment">Comment:</label>
+    <textarea id="comment" name="comment" placeholder="Leave a comment" required style="width: 100%; margin-bottom: 10px; padding: 8px;"></textarea>
+    <button type="submit" style="padding: 10px 20px; background-color: #4CAF50; color: white; border: none; cursor: pointer;">Post Comment</button>
+  </form>
+  <div id="successMessage" style="display:none; margin-top: 20px; color: green;">Your comment has been posted!</div>
+  <div id="errorMessage" style="display:none; margin-top: 20px; color: red;">There was an error posting your comment. Please try again.</div>
+</body>
+</html>
