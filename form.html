@@ -13,22 +13,27 @@
     .hidden { display: none; }
 
     /* Compact login form */
+    #auth-section {
+      margin-bottom: 1.5em;
+      text-align: center; /* center input and button */
+    }
     #auth-section input[type="email"] {
-      width: 250px;       /* ~30-35 characters */
-      padding: 0.4em;
-      font-size: 1em;
+      width: 220px;       /* Short width */
+      padding: 0.35em;
+      font-size: 0.95em;
       display: inline-block;
-      margin-right: 0.5em;
+      margin-right: 0.3em;
+      box-sizing: border-box;
     }
     #auth-section button {
-      padding: 0.45em 1em; /* Slightly bigger than text */
-      font-size: 1em;
+      padding: 0.35em 0.9em; /* Smaller button */
+      font-size: 0.95em;
       display: inline-block;
       vertical-align: middle;
     }
     #auth-msg {
-      margin-top: 0.5em;
-      font-size: 0.9em;
+      margin-top: 0.3em;
+      font-size: 0.85em;
       color: green;
     }
   </style>
