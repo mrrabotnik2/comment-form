@@ -3,235 +3,174 @@
 <head>
   <meta charset="UTF-8">
   <title>Forum</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
-    body { font-family: serif; max-width: 800px; margin: 2em auto; }
-    input, textarea, select, button { margin-bottom: 1em; width: 100%; padding: 0.5em; }
-    #logged-in, #forum-container { display: none; margin-top: 2em; }
-    .thread, .post { border-bottom: 1px dotted black; padding: 0.5em 0; }
-    .thread-title { font-weight: bold; cursor: pointer; }
-    textarea { height: 80px; resize: vertical; }
+    body { font-family: serif; max-width: 700px; margin: 2em auto; }
+    .comment, .post, .thread { margin-bottom: 1em; padding-left: 1em; padding-bottom: 1em; border-bottom: 1px dotted black; width: 100%; white-space: normal; word-wrap: break-word; }
+    textarea { width: 100%; height: 80px; min-width: 400px; margin-bottom: 1em; resize: vertical; }
+    input { margin-bottom: 1em; }
+    button { margin-top: 1em; }
+    #sections, #threads, #posts { margin-top: 2em; }
+    #userEmail { margin-bottom: 1em; font-weight: bold; }
   </style>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-<h2>Forum Login</h2>
+<h3>Forum</h3>
 
-<div id="auth-container">
-  <div id="logged-out">
-    <input type="email" id="email-input" placeholder="Enter your email">
-    <button id="login-btn">Send Magic Link</button>
-    <p id="auth-message"></p>
-  </div>
-
-  <div id="logged-in">
-    <span id="user-email"></span>
-    <button id="logout-btn">Log Out</button>
-  </div>
+<!-- User info / login -->
+<div id="loginDiv">
+  <input id="email" type="email" placeholder="Your Email">
+  <button onclick="sendMagicLink()">Send Magic Link</button>
 </div>
+<div id="userEmail" style="display:none;"></div>
 
-<div id="forum-container">
-  <h3>Forum Sections</h3>
-  <select id="section-select"></select>
-  <button id="new-thread-btn">New Thread</button>
+<!-- Forum sections -->
+<div id="forumDiv" style="display:none;">
+  <h4>Sections</h4>
+  <select id="sections" onchange="loadThreads()"></select>
+  <button onclick="createThreadPrompt()">New Thread</button>
 
-  <div id="threads-list"></div>
-</div>
+  <h4>Threads</h4>
+  <div id="threads"></div>
 
-<!-- New Thread Modal -->
-<div id="new-thread-modal" style="display:none;">
-  <h4>New Thread</h4>
-  <input id="thread-title" placeholder="Thread title">
-  <textarea id="thread-content" placeholder="Write your first post"></textarea>
-  <button id="post-thread-btn">Post Thread</button>
-  <button id="close-thread-btn">Cancel</button>
-</div>
-
-<!-- Posts Section -->
-<div id="posts-container" style="display:none;">
-  <h3 id="thread-header"></h3>
-  <div id="posts-list"></div>
-  <textarea id="reply-content" placeholder="Write a reply"></textarea>
-  <button id="post-reply-btn">Post Reply</button>
-  <button id="back-btn">Back to Threads</button>
+  <h4>Posts</h4>
+  <div id="posts"></div>
+  <textarea id="postContent" placeholder="Write a reply..."></textarea><br>
+  <button onclick="postReply()">Post Reply</button>
 </div>
 
 <script>
-const supabaseUrl = 'https://pidzgdrdgqgsayfoxqba.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZHpnZHJkZ3Fnc2F5Zm94cWJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NDI1OTcsImV4cCI6MjA4MTIxODU5N30.6sNn3jbNVfl-MEowIEjUknEKHlOcfKvVRa5pFqCHiw0';
-const sb = supabase.createClient(supabaseUrl, supabaseKey);
+  // ================================
+  // Supabase initialization
+  // ================================
+  const sb = supabase.createClient(
+    'https://pidzgdrdgqgsayfoxqba.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZHpnZHJkZ3Fnc2F5Zm94cWJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NDI1OTcsImV4cCI6MjA4MTIxODU5N30.6sNn3jbNVfl-MEowIEjUknEKHlOcfKvVRa5fqCHiw0'
+  );
 
-// Elements
-const emailInput = document.getElementById('email-input');
-const loginBtn = document.getElementById('login-btn');
-const authMessage = document.getElementById('auth-message');
-const loggedOutDiv = document.getElementById('logged-out');
-const loggedInDiv = document.getElementById('logged-in');
-const userEmailSpan = document.getElementById('user-email');
-const logoutBtn = document.getElementById('logout-btn');
+  let currentUser = null;
+  let currentSection = null;
+  let currentThread = null;
 
-const forumContainer = document.getElementById('forum-container');
-const sectionSelect = document.getElementById('section-select');
-const threadsList = document.getElementById('threads-list');
-const newThreadBtn = document.getElementById('new-thread-btn');
+  // ================================
+  // Magic Link login
+  // ================================
+  async function sendMagicLink() {
+    const email = document.getElementById('email').value.trim();
+    if (!email) { alert('Enter your email'); return; }
 
-const newThreadModal = document.getElementById('new-thread-modal');
-const threadTitleInput = document.getElementById('thread-title');
-const threadContentInput = document.getElementById('thread-content');
-const postThreadBtn = document.getElementById('post-thread-btn');
-const closeThreadBtn = document.getElementById('close-thread-btn');
+    const { error } = await sb.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: 'https://mrrabotnik2.github.io/comment-form/form.html' }
+    });
 
-const postsContainer = document.getElementById('posts-container');
-const threadHeader = document.getElementById('thread-header');
-const postsList = document.getElementById('posts-list');
-const replyContent = document.getElementById('reply-content');
-const postReplyBtn = document.getElementById('post-reply-btn');
-const backBtn = document.getElementById('back-btn');
-
-let currentUser = null;
-let currentThreadId = null;
-
-// ------------------------
-// Auth
-// ------------------------
-async function checkAuth() {
-  const { data: { session } } = await sb.auth.getSession();
-  currentUser = session ? session.user : null;
-  updateAuthUI();
-  if(currentUser) loadSections();
-}
-
-function updateAuthUI() {
-  if(currentUser) {
-    loggedOutDiv.style.display = 'none';
-    loggedInDiv.style.display = 'block';
-    userEmailSpan.textContent = currentUser.email;
-    forumContainer.style.display = 'block';
-  } else {
-    loggedOutDiv.style.display = 'block';
-    loggedInDiv.style.display = 'none';
-    forumContainer.style.display = 'none';
+    if (error) { console.error(error); alert('Error sending Magic Link: ' + error.message); return; }
+    alert('Check your email for the Magic Link!');
   }
-}
 
-loginBtn.addEventListener('click', async () => {
-  const email = emailInput.value.trim();
-  if(!email){ authMessage.textContent='Enter email'; return; }
-  const { error } = await sb.auth.signInWithOtp({ email });
-  if(error) authMessage.textContent='Error: '+error.message;
-  else authMessage.textContent='Magic link sent!';
-});
+  async function checkUser() {
+    const { data: { session } } = await sb.auth.getSession();
+    currentUser = session?.user ?? null;
+    if (currentUser) {
+      document.getElementById('loginDiv').style.display = 'none';
+      document.getElementById('userEmail').style.display = 'block';
+      document.getElementById('userEmail').innerText = 'Logged in as: ' + currentUser.email;
+      document.getElementById('forumDiv').style.display = 'block';
+      loadSections();
+    }
+  }
 
-logoutBtn.addEventListener('click', async () => {
-  await sb.auth.signOut();
-  currentUser = null;
-  updateAuthUI();
-});
+  sb.auth.onAuthStateChange((_event, session) => { currentUser = session?.user ?? null; checkUser(); });
+  checkUser();
 
-sb.auth.onAuthStateChange((_event, session) => {
-  currentUser = session ? session.user : null;
-  updateAuthUI();
-  if(currentUser) loadSections();
-});
+  // ================================
+  // Load forum sections
+  // ================================
+  async function loadSections() {
+    const { data, error } = await sb.from('forum_sections').select('*');
+    if (error) { console.error(error); return; }
+    const sel = document.getElementById('sections');
+    sel.innerHTML = '';
+    data.forEach(sec => sel.add(new Option(sec.name, sec.id)));
+    if (data.length > 0) { currentSection = data[0].id; loadThreads(); }
+  }
 
-checkAuth();
+  // ================================
+  // Load threads
+  // ================================
+  async function loadThreads() {
+    const sel = document.getElementById('sections');
+    currentSection = sel.value;
+    const { data, error } = await sb.from('threads').select('*').eq('section_id', currentSection).order('created_at', { ascending: false });
+    if (error) { console.error(error); return; }
+    const container = document.getElementById('threads');
+    container.innerHTML = '';
+    data.forEach(t => {
+      const div = document.createElement('div');
+      div.className = 'thread';
+      div.innerHTML = `<strong>${t.title}</strong> <button onclick="loadPosts('${t.id}')">Open</button>`;
+      container.appendChild(div);
+    });
+  }
 
-// ------------------------
-// Load Sections
-// ------------------------
-async function loadSections() {
-  const { data, error } = await sb.from('forum_sections').select('*').order('name');
-  if(error){ console.error(error); return; }
-  sectionSelect.innerHTML='';
-  data.forEach(s => {
-    const opt = document.createElement('option');
-    opt.value = s.id;
-    opt.textContent = s.name;
-    sectionSelect.appendChild(opt);
-  });
-  loadThreads();
-}
+  // ================================
+  // Load posts
+  // ================================
+  async function loadPosts(threadId) {
+    currentThread = threadId;
+    const { data, error } = await sb.from('posts').select('*').eq('thread_id', threadId).order('created_at', { ascending: true });
+    if (error) { console.error(error); return; }
+    const container = document.getElementById('posts');
+    container.innerHTML = '';
+    data.forEach(p => {
+      const div = document.createElement('div');
+      div.className = 'post';
+      div.innerHTML = `<strong>${p.author_id}</strong><br>${p.content}`;
+      container.appendChild(div);
+    });
+  }
 
-// ------------------------
-// Load Threads
-// ------------------------
-async function loadThreads() {
-  const sectionId = sectionSelect.value;
-  const { data, error } = await sb.from('threads').select('*').eq('section_id', sectionId).order('created_at', {ascending:false});
-  if(error){ console.error(error); return; }
-  threadsList.innerHTML='';
-  data.forEach(t=>{
-    const div = document.createElement('div');
-    div.className='thread';
-    div.innerHTML=`<div class="thread-title" data-id="${t.id}">${t.title}</div><div>by ${t.author_id}</div>`;
-    div.querySelector('.thread-title').addEventListener('click',()=>openThread(t.id,t.title));
-    threadsList.appendChild(div);
-  });
-}
+  // ================================
+  // Post reply
+  // ================================
+  async function postReply() {
+    if (!currentThread) { alert('Select a thread first'); return; }
+    const content = document.getElementById('postContent').value.trim();
+    if (!content) { alert('Enter your reply'); return; }
 
-// ------------------------
-// New Thread
-// ------------------------
-newThreadBtn.addEventListener('click',()=>{ newThreadModal.style.display='block'; });
-closeThreadBtn.addEventListener('click',()=>{ newThreadModal.style.display='none'; threadTitleInput.value=''; threadContentInput.value=''; });
+    const { error } = await sb.from('posts').insert({
+      thread_id: currentThread,
+      content,
+      author_id: currentUser.email
+    });
+    if (error) { console.error(error); alert('Error posting reply'); return; }
+    document.getElementById('postContent').value = '';
+    loadPosts(currentThread);
+  }
 
-postThreadBtn.addEventListener('click',async ()=>{
-  if(!currentUser) { alert('Log in first'); return; }
-  const title = threadTitleInput.value.trim();
-  const content = threadContentInput.value.trim();
-  const sectionId = sectionSelect.value;
-  if(!title || !content){ alert('Fill title and content'); return; }
-  const { data: thread, error } = await sb.from('threads').insert([{title, section_id: sectionId, author_id: currentUser.id}]).select().single();
-  if(error){ console.error(error); return; }
-  await sb.from('posts').insert([{thread_id: thread.id, content, author_id: currentUser.id}]);
-  newThreadModal.style.display='none';
-  threadTitleInput.value=''; threadContentInput.value='';
-  loadThreads();
-});
+  // ================================
+  // Create new thread
+  // ================================
+  function createThreadPrompt() {
+    const title = prompt('Enter thread title');
+    if (!title) return;
+    createThread(title);
+  }
 
-// ------------------------
-// Thread & Posts
-// ------------------------
-function openThread(threadId,title){
-  currentThreadId=threadId;
-  forumContainer.style.display='none';
-  postsContainer.style.display='block';
-  threadHeader.textContent=title;
-  loadPosts();
-}
+  async function createThread(title) {
+    const { data, error } = await sb.from('threads').insert({
+      section_id: currentSection,
+      title,
+      author_id: currentUser.email
+    });
+    if (error) { console.error(error); alert('Error creating thread'); return; }
+    loadThreads();
+  }
 
-async function loadPosts(){
-  const { data, error } = await sb.from('posts').select('*').eq('thread_id', currentThreadId).order('created_at');
-  if(error){ console.error(error); return; }
-  postsList.innerHTML='';
-  data.forEach(p=>{
-    const div = document.createElement('div');
-    div.className='post';
-    div.innerHTML=`<strong>${p.author_id}</strong><br>${p.content}`;
-    postsList.appendChild(div);
-  });
-}
-
-postReplyBtn.addEventListener('click',async ()=>{
-  if(!currentUser) { alert('Log in first'); return; }
-  const content = replyContent.value.trim();
-  if(!content) return;
-  await sb.from('posts').insert([{thread_id: currentThreadId, content, author_id: currentUser.id}]);
-  replyContent.value='';
-  loadPosts();
-});
-
-backBtn.addEventListener('click',()=>{
-  postsContainer.style.display='none';
-  forumContainer.style.display='block';
-  loadThreads();
-});
-
-// ------------------------
-// Section change
-// ------------------------
-sectionSelect.addEventListener('change',()=>loadThreads());
 </script>
-
 </body>
 </html>
