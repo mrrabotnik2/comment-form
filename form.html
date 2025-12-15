@@ -6,30 +6,32 @@
 
   <style>
     body { font-family: serif; max-width: 700px; margin: 2em auto; }
-    .comment, .post, .thread { margin-bottom: 1em; padding-left: 1em; padding-bottom: 1em; border-bottom: 1px dotted black; width: 100%; white-space: normal; word-wrap: break-word; }
-    textarea { width: 100%; height: 80px; min-width: 400px; margin-bottom: 1em; resize: vertical; }
-    input { margin-bottom: 1em; }
-    button { margin-top: 1em; }
-    #sections, #threads, #posts { margin-top: 2em; }
-    #userEmail { margin-bottom: 1em; font-weight: bold; }
+    input, textarea, button, select { margin-bottom: 1em; font-size: 1em; }
+    textarea { width: 100%; height: 80px; resize: vertical; }
+    button { cursor: pointer; }
+    .section, .thread, .post { padding: 0.5em; border-bottom: 1px dotted #000; }
+    .thread { margin-left: 1em; }
+    .post { margin-left: 2em; }
+    #forumDiv { display: none; }
+    #userEmail { font-weight: bold; margin-bottom: 1em; display: none; }
   </style>
 
-  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-<h3>Forum</h3>
+<h2>Forum</h2>
 
-<!-- User info / login -->
+<!-- Login -->
 <div id="loginDiv">
   <input id="email" type="email" placeholder="Your Email">
   <button onclick="sendMagicLink()">Send Magic Link</button>
 </div>
-<div id="userEmail" style="display:none;"></div>
 
-<!-- Forum sections -->
-<div id="forumDiv" style="display:none;">
+<div id="userEmail"></div>
+
+<!-- Forum -->
+<div id="forumDiv">
   <h4>Sections</h4>
   <select id="sections" onchange="loadThreads()"></select>
   <button onclick="createThreadPrompt()">New Thread</button>
@@ -44,13 +46,11 @@
 </div>
 
 <script>
-  // ================================
-  // Supabase initialization
-  // ================================
-const sb = supabase.createClient(
-  'https://pidzgdrdgqgsayfoxqba.supabase.co',
-  'sb_publishable_-rGnPqFMdXSVXmKdI2bCow_R7uuC53z'
-);
+  // Initialize Supabase
+  const sb = supabase.createClient(
+    'https://pidzgdrdgqgsayfoxqba.supabase.co',
+    'sb_publishable_-rGnPqFMdXSVXmKdI2bCow_R7uuC53z'
+  );
 
   let currentUser = null;
   let currentSection = null;
@@ -65,7 +65,9 @@ const sb = supabase.createClient(
 
     const { error } = await sb.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: 'https://mrrabotnik2.github.io/comment-form/form.html' }
+      options: {
+        emailRedirectTo: 'https://mrrabotnik2.github.io/comment-form/form.html'
+      }
     });
 
     if (error) { console.error(error); alert('Error sending Magic Link: ' + error.message); return; }
@@ -75,6 +77,7 @@ const sb = supabase.createClient(
   async function checkUser() {
     const { data: { session } } = await sb.auth.getSession();
     currentUser = session?.user ?? null;
+
     if (currentUser) {
       document.getElementById('loginDiv').style.display = 'none';
       document.getElementById('userEmail').style.display = 'block';
@@ -88,11 +91,12 @@ const sb = supabase.createClient(
   checkUser();
 
   // ================================
-  // Load forum sections
+  // Load sections
   // ================================
   async function loadSections() {
     const { data, error } = await sb.from('forum_sections').select('*');
     if (error) { console.error(error); return; }
+
     const sel = document.getElementById('sections');
     sel.innerHTML = '';
     data.forEach(sec => sel.add(new Option(sec.name, sec.id)));
@@ -107,6 +111,7 @@ const sb = supabase.createClient(
     currentSection = sel.value;
     const { data, error } = await sb.from('threads').select('*').eq('section_id', currentSection).order('created_at', { ascending: false });
     if (error) { console.error(error); return; }
+
     const container = document.getElementById('threads');
     container.innerHTML = '';
     data.forEach(t => {
@@ -124,6 +129,7 @@ const sb = supabase.createClient(
     currentThread = threadId;
     const { data, error } = await sb.from('posts').select('*').eq('thread_id', threadId).order('created_at', { ascending: true });
     if (error) { console.error(error); return; }
+
     const container = document.getElementById('posts');
     container.innerHTML = '';
     data.forEach(p => {
@@ -147,6 +153,7 @@ const sb = supabase.createClient(
       content,
       author_id: currentUser.email
     });
+
     if (error) { console.error(error); alert('Error posting reply'); return; }
     document.getElementById('postContent').value = '';
     loadPosts(currentThread);
@@ -170,7 +177,6 @@ const sb = supabase.createClient(
     if (error) { console.error(error); alert('Error creating thread'); return; }
     loadThreads();
   }
-
 </script>
 </body>
 </html>
