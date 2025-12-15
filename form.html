@@ -6,11 +6,31 @@
   <style>
     body { font-family: sans-serif; max-width: 800px; margin: 2em auto; }
     h3, h4 { margin-bottom: 0.5em; }
-    select, input, textarea, button { display: block; width: 100%; margin-bottom: 1em; padding: 0.5em; }
+    select, textarea, button { display: block; width: 100%; margin-bottom: 1em; padding: 0.5em; }
     textarea { resize: vertical; height: 80px; }
     .thread, .post { border-bottom: 1px dotted #333; padding: 0.5em 0; }
     .thread:hover { background: #f4f4f4; cursor: pointer; }
     .hidden { display: none; }
+
+    /* Compact login form */
+    #auth-section input[type="email"] {
+      width: 250px;       /* ~30-35 characters */
+      padding: 0.4em;
+      font-size: 1em;
+      display: inline-block;
+      margin-right: 0.5em;
+    }
+    #auth-section button {
+      padding: 0.45em 1em; /* Slightly bigger than text */
+      font-size: 1em;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    #auth-msg {
+      margin-top: 0.5em;
+      font-size: 0.9em;
+      color: green;
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -60,7 +80,11 @@ async function sendMagicLink() {
   const email = document.getElementById('email').value.trim();
   if (!email) { alert('Enter your email'); return; }
 
-  const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.href }});
+  const { error } = await sb.auth.signInWithOtp({
+    email, 
+    options: { emailRedirectTo: window.location.href }
+  });
+
   if (error) {
     document.getElementById('auth-msg').innerText = 'Error sending Magic Link: ' + error.message;
   } else {
