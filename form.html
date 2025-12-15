@@ -12,13 +12,13 @@
     .thread:hover { background: #f4f4f4; cursor: pointer; }
     .hidden { display: none; }
 
-    /* Compact login form */
+    /* Compact login form with half-width button */
     #auth-section {
       margin-bottom: 1.5em;
-      text-align: center; /* center input and button */
+      text-align: center;
     }
     #auth-section input[type="email"] {
-      width: 220px;       /* Short width */
+      width: 220px;       /* Input width */
       padding: 0.35em;
       font-size: 0.95em;
       display: inline-block;
@@ -26,7 +26,8 @@
       box-sizing: border-box;
     }
     #auth-section button {
-      padding: 0.35em 0.9em; /* Smaller button */
+      width: 110px;       /* Half the width of input */
+      padding: 0.35em 0.5em;
       font-size: 0.95em;
       display: inline-block;
       vertical-align: middle;
