@@ -12,17 +12,17 @@
     .thread:hover { background: #f4f4f4; cursor: pointer; }
     .hidden { display: none; }
 
-    /* Compact login form with half-width button */
+    /* Compact login form with button aligned next to input */
     #auth-section {
       margin-bottom: 1.5em;
-      text-align: center;
+      text-align: left; /* Align input and button to start from left */
     }
     #auth-section input[type="email"] {
       width: 220px;       /* Input width */
       padding: 0.35em;
       font-size: 0.95em;
       display: inline-block;
-      margin-right: 0.3em;
+      vertical-align: middle;
       box-sizing: border-box;
     }
     #auth-section button {
@@ -30,7 +30,8 @@
       padding: 0.35em 0.5em;
       font-size: 0.95em;
       display: inline-block;
-      vertical-align: middle;
+      vertical-align: middle; /* Align with input */
+      margin-left: 0.3em;    /* Gap between input and button */
     }
     #auth-msg {
       margin-top: 0.3em;
