@@ -99,7 +99,7 @@
 
     const sel = document.getElementById('sections');
     sel.innerHTML = '';
-    data.forEach(sec => sel.add(new Option(sec.name, sec.id)));
+    data.forEach(sec => sel.add(new Option(sec.title, sec.id)));
     if (data.length > 0) { currentSection = data[0].id; loadThreads(); }
   }
 
