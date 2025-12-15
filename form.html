@@ -2,46 +2,236 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Comment Form</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-  <script>
-    const supabaseUrl = 'https://YOUR_SUPABASE_URL';
-    const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
-    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
-
-    const form = document.getElementById('commentForm');
-    form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-
-        const name = document.getElementById('name').value || 'Anonymous';
-        const comment = document.getElementById('comment').value;
-
-        try {
-            const { data, error } = await supabase
-                .from('comments')
-                .insert([{ name: name, comment: comment }]);
-
-            if (error) throw error;
-
-            document.getElementById('successMessage').style.display = 'block';
-            form.reset();
-        } catch (error) {
-            console.error(error);
-            document.getElementById('errorMessage').style.display = 'block';
-        }
-    });
-  </script>
+  <title>Forum</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: serif; max-width: 800px; margin: 2em auto; }
+    input, textarea, select, button { margin-bottom: 1em; width: 100%; padding: 0.5em; }
+    #logged-in, #forum-container { display: none; margin-top: 2em; }
+    .thread, .post { border-bottom: 1px dotted black; padding: 0.5em 0; }
+    .thread-title { font-weight: bold; cursor: pointer; }
+    textarea { height: 80px; resize: vertical; }
+  </style>
 </head>
 <body>
-  <form id="commentForm">
-    <label for="name">Name:</label>
-    <input type="text" id="name" name="name" placeholder="Your name" style="width: 100%; margin-bottom: 10px; padding: 8px;">
-    <label for="comment">Comment:</label>
-    <textarea id="comment" name="comment" placeholder="Leave a comment" required style="width: 100%; margin-bottom: 10px; padding: 8px;"></textarea>
-    <button type="submit" style="padding: 10px 20px; background-color: #4CAF50; color: white; border: none; cursor: pointer;">Post Comment</button>
-  </form>
-  <div id="successMessage" style="display:none; margin-top: 20px; color: green;">Your comment has been posted!</div>
-  <div id="errorMessage" style="display:none; margin-top: 20px; color: red;">There was an error posting your comment. Please try again.</div>
+
+<h2>Forum Login</h2>
+
+<div id="auth-container">
+  <div id="logged-out">
+    <input type="email" id="email-input" placeholder="Enter your email">
+    <button id="login-btn">Send Magic Link</button>
+    <p id="auth-message"></p>
+  </div>
+
+  <div id="logged-in">
+    <span id="user-email"></span>
+    <button id="logout-btn">Log Out</button>
+  </div>
+</div>
+
+<div id="forum-container">
+  <h3>Forum Sections</h3>
+  <select id="section-select"></select>
+  <button id="new-thread-btn">New Thread</button>
+
+  <div id="threads-list"></div>
+</div>
+
+<!-- New Thread Modal -->
+<div id="new-thread-modal" style="display:none;">
+  <h4>New Thread</h4>
+  <input id="thread-title" placeholder="Thread title">
+  <textarea id="thread-content" placeholder="Write your first post"></textarea>
+  <button id="post-thread-btn">Post Thread</button>
+  <button id="close-thread-btn">Cancel</button>
+</div>
+
+<!-- Posts Section -->
+<div id="posts-container" style="display:none;">
+  <h3 id="thread-header"></h3>
+  <div id="posts-list"></div>
+  <textarea id="reply-content" placeholder="Write a reply"></textarea>
+  <button id="post-reply-btn">Post Reply</button>
+  <button id="back-btn">Back to Threads</button>
+</div>
+
+<script>
+const supabaseUrl = 'https://pidzgdrdgqgsayfoxqba.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZHpnZHJkZ3Fnc2F5Zm94cWJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NDI1OTcsImV4cCI6MjA4MTIxODU5N30.6sNn3jbNVfl-MEowIEjUknEKHlOcfKvVRa5pFqCHiw0';
+const sb = supabase.createClient(supabaseUrl, supabaseKey);
+
+// Elements
+const emailInput = document.getElementById('email-input');
+const loginBtn = document.getElementById('login-btn');
+const authMessage = document.getElementById('auth-message');
+const loggedOutDiv = document.getElementById('logged-out');
+const loggedInDiv = document.getElementById('logged-in');
+const userEmailSpan = document.getElementById('user-email');
+const logoutBtn = document.getElementById('logout-btn');
+
+const forumContainer = document.getElementById('forum-container');
+const sectionSelect = document.getElementById('section-select');
+const threadsList = document.getElementById('threads-list');
+const newThreadBtn = document.getElementById('new-thread-btn');
+
+const newThreadModal = document.getElementById('new-thread-modal');
+const threadTitleInput = document.getElementById('thread-title');
+const threadContentInput = document.getElementById('thread-content');
+const postThreadBtn = document.getElementById('post-thread-btn');
+const closeThreadBtn = document.getElementById('close-thread-btn');
+
+const postsContainer = document.getElementById('posts-container');
+const threadHeader = document.getElementById('thread-header');
+const postsList = document.getElementById('posts-list');
+const replyContent = document.getElementById('reply-content');
+const postReplyBtn = document.getElementById('post-reply-btn');
+const backBtn = document.getElementById('back-btn');
+
+let currentUser = null;
+let currentThreadId = null;
+
+// ------------------------
+// Auth
+// ------------------------
+async function checkAuth() {
+  const { data: { session } } = await sb.auth.getSession();
+  currentUser = session ? session.user : null;
+  updateAuthUI();
+  if(currentUser) loadSections();
+}
+
+function updateAuthUI() {
+  if(currentUser) {
+    loggedOutDiv.style.display = 'none';
+    loggedInDiv.style.display = 'block';
+    userEmailSpan.textContent = currentUser.email;
+    forumContainer.style.display = 'block';
+  } else {
+    loggedOutDiv.style.display = 'block';
+    loggedInDiv.style.display = 'none';
+    forumContainer.style.display = 'none';
+  }
+}
+
+loginBtn.addEventListener('click', async () => {
+  const email = emailInput.value.trim();
+  if(!email){ authMessage.textContent='Enter email'; return; }
+  const { error } = await sb.auth.signInWithOtp({ email });
+  if(error) authMessage.textContent='Error: '+error.message;
+  else authMessage.textContent='Magic link sent!';
+});
+
+logoutBtn.addEventListener('click', async () => {
+  await sb.auth.signOut();
+  currentUser = null;
+  updateAuthUI();
+});
+
+sb.auth.onAuthStateChange((_event, session) => {
+  currentUser = session ? session.user : null;
+  updateAuthUI();
+  if(currentUser) loadSections();
+});
+
+checkAuth();
+
+// ------------------------
+// Load Sections
+// ------------------------
+async function loadSections() {
+  const { data, error } = await sb.from('forum_sections').select('*').order('name');
+  if(error){ console.error(error); return; }
+  sectionSelect.innerHTML='';
+  data.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = s.name;
+    sectionSelect.appendChild(opt);
+  });
+  loadThreads();
+}
+
+// ------------------------
+// Load Threads
+// ------------------------
+async function loadThreads() {
+  const sectionId = sectionSelect.value;
+  const { data, error } = await sb.from('threads').select('*').eq('section_id', sectionId).order('created_at', {ascending:false});
+  if(error){ console.error(error); return; }
+  threadsList.innerHTML='';
+  data.forEach(t=>{
+    const div = document.createElement('div');
+    div.className='thread';
+    div.innerHTML=`<div class="thread-title" data-id="${t.id}">${t.title}</div><div>by ${t.author_id}</div>`;
+    div.querySelector('.thread-title').addEventListener('click',()=>openThread(t.id,t.title));
+    threadsList.appendChild(div);
+  });
+}
+
+// ------------------------
+// New Thread
+// ------------------------
+newThreadBtn.addEventListener('click',()=>{ newThreadModal.style.display='block'; });
+closeThreadBtn.addEventListener('click',()=>{ newThreadModal.style.display='none'; threadTitleInput.value=''; threadContentInput.value=''; });
+
+postThreadBtn.addEventListener('click',async ()=>{
+  if(!currentUser) { alert('Log in first'); return; }
+  const title = threadTitleInput.value.trim();
+  const content = threadContentInput.value.trim();
+  const sectionId = sectionSelect.value;
+  if(!title || !content){ alert('Fill title and content'); return; }
+  const { data: thread, error } = await sb.from('threads').insert([{title, section_id: sectionId, author_id: currentUser.id}]).select().single();
+  if(error){ console.error(error); return; }
+  await sb.from('posts').insert([{thread_id: thread.id, content, author_id: currentUser.id}]);
+  newThreadModal.style.display='none';
+  threadTitleInput.value=''; threadContentInput.value='';
+  loadThreads();
+});
+
+// ------------------------
+// Thread & Posts
+// ------------------------
+function openThread(threadId,title){
+  currentThreadId=threadId;
+  forumContainer.style.display='none';
+  postsContainer.style.display='block';
+  threadHeader.textContent=title;
+  loadPosts();
+}
+
+async function loadPosts(){
+  const { data, error } = await sb.from('posts').select('*').eq('thread_id', currentThreadId).order('created_at');
+  if(error){ console.error(error); return; }
+  postsList.innerHTML='';
+  data.forEach(p=>{
+    const div = document.createElement('div');
+    div.className='post';
+    div.innerHTML=`<strong>${p.author_id}</strong><br>${p.content}`;
+    postsList.appendChild(div);
+  });
+}
+
+postReplyBtn.addEventListener('click',async ()=>{
+  if(!currentUser) { alert('Log in first'); return; }
+  const content = replyContent.value.trim();
+  if(!content) return;
+  await sb.from('posts').insert([{thread_id: currentThreadId, content, author_id: currentUser.id}]);
+  replyContent.value='';
+  loadPosts();
+});
+
+backBtn.addEventListener('click',()=>{
+  postsContainer.style.display='none';
+  forumContainer.style.display='block';
+  loadThreads();
+});
+
+// ------------------------
+// Section change
+// ------------------------
+sectionSelect.addEventListener('change',()=>loadThreads());
+</script>
+
 </body>
 </html>
