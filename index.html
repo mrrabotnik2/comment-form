@@ -61,20 +61,18 @@
 </div>
 
 <script>
-  // 🔑 Supabase connection (your Project URL + anon key)
+  // 🔑 Supabase connection
   const supabaseClient = supabase.createClient(
     "https://pidzgdrdgqgsayfoxqba.supabase.co",
     "sb_publishable_-rGnPqFMdXSVXmKdI2bCow_R7uuC53z"
   );
 
-  // Get story ID from URL
   const storyId = new URLSearchParams(window.location.search).get("story");
 
   if (!storyId) {
     document.body.innerHTML = "<p>Missing story ID.</p>";
   }
 
-  // Check login status
   async function checkUser() {
     const { data: { user } } = await supabaseClient.auth.getUser();
 
@@ -86,24 +84,34 @@
     }
   }
 
-  // Show login/signup form
   function showAuth() {
     document.getElementById("auth").innerHTML = `
       <input id="email" type="email" placeholder="Email">
       <input id="password" type="password" placeholder="Password">
-      <button onclick="login()">Log in</button>
+      <input id="nickname" type="text" placeholder="Nickname" />
       <button onclick="signup()">Sign up</button>
+      <button onclick="login()">Log in</button>
     `;
   }
 
   async function signup() {
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
+    const nickname = document.getElementById("nickname").value;
 
-    const { error } = await supabaseClient.auth.signUp({ email, password });
+    const { user, error } = await supabaseClient.auth.signUp({ email, password });
 
     if (error) {
       alert(error.message);
+      return;
+    }
+
+    const { error: updateError } = await supabaseClient
+      .from("users")
+      .upsert({ id: user.id, nickname: nickname });
+
+    if (updateError) {
+      alert(updateError.message);
     } else {
       alert("Check your email to confirm your account.");
     }
@@ -127,7 +135,6 @@
     location.reload();
   }
 
-  // Post a comment
   async function postComment() {
     const comment = document.getElementById("commentInput").value.trim();
     if (!comment) return;
@@ -141,60 +148,4 @@
     });
 
     if (error) {
-      alert(error.message);
-    } else {
-      document.getElementById("commentInput").value = "";
-      loadComments();
-    }
-  }
-
-  // Load comments
-  async function loadComments() {
-    const { data, error } = await supabaseClient
-      .from("story_comments")
-      .select("content, created_at")
-      .eq("story_id", storyId)
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    const list = document.getElementById("commentList");
-    list.innerHTML = "";
-
-    data.forEach(c => {
-      const div = document.createElement("div");
-      div.className = "comment";
-      div.innerHTML = `
-        <div>${escapeHtml(c.content)}</div>
-        <div class="meta">${new Date(c.created_at).toLocaleString()}</div>
-      `;
-      list.appendChild(div);
-    });
-  }
-
-  // Prevent XSS
-  function escapeHtml(text) {
-    return text.replace(/[&<>"']/g, m => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#039;"
-    }[m]));
-  }
-
-  // Show comments section
-  function showComments() {
-    document.getElementById("auth").style.display = "none";
-    document.getElementById("commentsSection").style.display = "block";
-  }
-
-  // Start app
-  checkUser();
-</script>
-
-</body>
-</html>
+      alert(error.message
