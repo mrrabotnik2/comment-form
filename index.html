@@ -54,7 +54,7 @@
     }[m]));
   }
 
-  // Show login/signup
+  // Show login/signup form
   function showAuth() {
     document.getElementById("auth").innerHTML = `
       <input id="email" type="email" placeholder="Email">
@@ -78,7 +78,7 @@
     else { showComments(); loadComments(); }
   }
 
-  // Signup
+  // Sign up
   async function signup() {
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
@@ -93,17 +93,40 @@
       return;
     }
 
+    // Inform user to check their email for confirmation
     alert("Check your email to confirm your account.");
+    document.getElementById("auth").innerHTML = "<p>Check your email for the confirmation link.</p>";
   }
 
-  // Login
+  // Log in
   async function login() {
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
 
     const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (error) alert(error.message);
-    else checkUser();
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    // After login, update nickname if necessary
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    const nickname = document.getElementById("nickname").value.trim();
+
+    if (nickname) {
+      const { error } = await supabaseClient
+        .from("users")
+        .upsert({ id: user.id, nickname });
+
+      if (error) {
+        alert("Error saving nickname.");
+        return;
+      }
+    }
+
+    // Show comments after login
+    showComments();
+    loadComments();
   }
 
   // Logout
@@ -112,7 +135,7 @@
     location.reload();
   }
 
-  // Post comment
+  // Post a comment
   async function postComment() {
     const comment = document.getElementById("commentInput").value.trim();
     if (!comment) return;
@@ -151,21 +174,6 @@
       `;
       list.appendChild(div);
     });
-  }
-
-  // Update nickname after first login
-  async function updateNickname(user) {
-    const nickname = document.getElementById("nickname").value.trim();
-    if (nickname) {
-      const { error } = await supabaseClient
-        .from("users")
-        .upsert({ id: user.id, nickname });
-
-      if (error) {
-        alert("Error saving nickname.");
-        return;
-      }
-    }
   }
 
   // Start
