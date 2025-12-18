@@ -23,8 +23,8 @@ button { cursor: pointer; }
 
 <div id="commentsSection" style="display:none;">
   <textarea id="commentInput" placeholder="Write a comment..."></textarea>
-  <button id="postComment">Post Comment</button>
-  <button id="logout">Log out</button>
+  <button id="postCommentBtn">Post Comment</button>
+  <button id="logoutBtn">Log out</button>
   <div id="commentList"></div>
 </div>
 
@@ -42,18 +42,21 @@ function escapeHtml(text) {
   }[m]));
 }
 
+// Show login/signup form
 function showAuth() {
-  document.getElementById("auth").innerHTML = `
+  const authDiv = document.getElementById("auth");
+  authDiv.innerHTML = `
     <input id="email" type="email" placeholder="Email">
     <input id="password" type="password" placeholder="Password">
     <input id="nickname" type="text" placeholder="Nickname">
     <button id="signupBtn">Sign Up</button>
     <button id="loginBtn">Log In</button>
   `;
-  document.getElementById("signupBtn").addEventListener("click", signup);
-  document.getElementById("loginBtn").addEventListener("click", login);
+  document.getElementById("signupBtn").addEventListener("click", e => { e.preventDefault(); signup(); });
+  document.getElementById("loginBtn").addEventListener("click", e => { e.preventDefault(); login(); });
 }
 
+// Show comments section
 function showComments() {
   document.getElementById("auth").style.display = "none";
   document.getElementById("commentsSection").style.display = "block";
@@ -61,14 +64,16 @@ function showComments() {
 
 async function checkUser() {
   const { data: { user } } = await supabaseClient.auth.getUser();
-  if (user) showComments();
+  if (user) { showComments(); loadComments(); }
   else showAuth();
 }
 
+// Sign Up
 async function signup() {
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
   const nickname = document.getElementById("nickname").value.trim();
+
   if (!email || !password || !nickname) { alert("Fill all fields"); return; }
 
   const { data, error } = await supabaseClient.auth.signUp({ email, password });
@@ -77,6 +82,7 @@ async function signup() {
   alert("Check your email to confirm your account before logging in.");
 }
 
+// Log In
 async function login() {
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
@@ -88,7 +94,6 @@ async function login() {
   const user = data.user;
   if (!user) { alert("Email not confirmed yet."); return; }
 
-  // Upsert nickname
   if (nickname) {
     const { error: nickError } = await supabaseClient.from("users").upsert({ id: user.id, nickname });
     if (nickError) alert("Error saving nickname: " + nickError.message);
@@ -98,14 +103,16 @@ async function login() {
   loadComments();
 }
 
-document.getElementById("logout")?.addEventListener("click", async () => {
+// Logout
+document.getElementById("logoutBtn").addEventListener("click", async e => {
+  e.preventDefault();
   await supabaseClient.auth.signOut();
   location.reload();
 });
 
-document.getElementById("postComment")?.addEventListener("click", postComment);
-
-async function postComment() {
+// Post Comment
+document.getElementById("postCommentBtn").addEventListener("click", async e => {
+  e.preventDefault();
   const comment = document.getElementById("commentInput").value.trim();
   if (!comment) return;
 
@@ -115,16 +122,18 @@ async function postComment() {
   const { error } = await supabaseClient.from("story_comments").insert({
     story_id: storyId, content: comment, user_id: user.id
   });
+
   if (error) alert(error.message);
   else { document.getElementById("commentInput").value = ""; loadComments(); }
-}
+});
 
+// Load Comments
 async function loadComments() {
   const { data, error } = await supabaseClient
     .from("story_comments")
     .select("content, created_at, users(nickname)")
     .eq("story_id", storyId)
-    .order("created_at", { ascending:true });
+    .order("created_at", { ascending: true });
 
   if (error) { alert(error.message); return; }
 
@@ -139,6 +148,7 @@ async function loadComments() {
   });
 }
 
+// Initialize
 checkUser();
 </script>
 </body>
