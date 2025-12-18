@@ -61,21 +61,49 @@
 </div>
 
 <script>
-  // 🔑 Supabase connection
+  // Supabase connection
   const supabaseClient = supabase.createClient(
     "https://pidzgdrdgqgsayfoxqba.supabase.co",
     "sb_publishable_-rGnPqFMdXSVXmKdI2bCow_R7uuC53z"
   );
 
+  // Get story ID from URL
   const storyId = new URLSearchParams(window.location.search).get("story");
-
   if (!storyId) {
     document.body.innerHTML = "<p>Missing story ID.</p>";
   }
 
+  // Escape HTML to prevent XSS
+  function escapeHtml(text) {
+    return text.replace(/[&<>"']/g, m => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;"
+    }[m]));
+  }
+
+  // Show login/signup form
+  function showAuth() {
+    document.getElementById("auth").innerHTML = `
+      <input id="email" type="email" placeholder="Email">
+      <input id="password" type="password" placeholder="Password">
+      <input id="nickname" type="text" placeholder="Nickname">
+      <button onclick="signup()">Sign up</button>
+      <button onclick="login()">Log in</button>
+    `;
+  }
+
+  // Show comments section
+  function showComments() {
+    document.getElementById("auth").style.display = "none";
+    document.getElementById("commentsSection").style.display = "block";
+  }
+
+  // Check current user session
   async function checkUser() {
     const { data: { user } } = await supabaseClient.auth.getUser();
-
     if (!user) {
       showAuth();
     } else {
@@ -84,28 +112,24 @@
     }
   }
 
-  function showAuth() {
-    document.getElementById("auth").innerHTML = `
-      <input id="email" type="email" placeholder="Email">
-      <input id="password" type="password" placeholder="Password">
-      <input id="nickname" type="text" placeholder="Nickname" />
-      <button onclick="signup()">Sign up</button>
-      <button onclick="login()">Log in</button>
-    `;
-  }
-
+  // Signup with nickname
   async function signup() {
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
-    const nickname = document.getElementById("nickname").value;
+    const nickname = document.getElementById("nickname").value.trim();
+
+    if (!nickname) {
+      alert("Please enter a nickname.");
+      return;
+    }
 
     const { user, error } = await supabaseClient.auth.signUp({ email, password });
-
     if (error) {
       alert(error.message);
       return;
     }
 
+    // Add nickname to users table
     const { error: updateError } = await supabaseClient
       .from("users")
       .upsert({ id: user.id, nickname: nickname });
@@ -117,12 +141,12 @@
     }
   }
 
+  // Login existing user
   async function login() {
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
 
     const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-
     if (error) {
       alert(error.message);
     } else {
@@ -130,11 +154,13 @@
     }
   }
 
+  // Logout
   async function logout() {
     await supabaseClient.auth.signOut();
     location.reload();
   }
 
+  // Post a comment
   async function postComment() {
     const comment = document.getElementById("commentInput").value.trim();
     if (!comment) return;
@@ -148,4 +174,43 @@
     });
 
     if (error) {
-      alert(error.message
+      alert(error.message);
+    } else {
+      document.getElementById("commentInput").value = "";
+      loadComments();
+    }
+  }
+
+  // Load comments with nickname
+  async function loadComments() {
+    const { data, error } = await supabaseClient
+      .from("story_comments")
+      .select("content, created_at, users(nickname)")
+      .eq("story_id", storyId)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    const list = document.getElementById("commentList");
+    list.innerHTML = "";
+
+    data.forEach(c => {
+      const div = document.createElement("div");
+      div.className = "comment";
+      div.innerHTML = `
+        <div><strong>${escapeHtml(c.users?.nickname || "Anonymous")}:</strong> ${escapeHtml(c.content)}</div>
+        <div class="meta">${new Date(c.created_at).toLocaleString()}</div>
+      `;
+      list.appendChild(div);
+    });
+  }
+
+  // Start app
+  checkUser();
+</script>
+
+</body>
+</html>
