@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Story Comments</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Supabase JS -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: auto;
+      padding: 10px;
+    }
+
+    input, textarea, button {
+      width: 100%;
+      margin-top: 6px;
+      padding: 8px;
+    }
+
+    textarea {
+      min-height: 80px;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .comment {
+      border-bottom: 1px solid #ddd;
+      padding: 8px 0;
+    }
+
+    .meta {
+      font-size: 0.8em;
+      color: #666;
+    }
+
+    #logout {
+      margin-top: 10px;
+      background: #eee;
+    }
+  </style>
+</head>
+<body>
+
+<h3>Comments</h3>
+
+<div id="auth"></div>
+
+<div id="commentsSection" style="display:none;">
+  <textarea id="commentInput" placeholder="Write a comment..."></textarea>
+  <button onclick="postComment()">Post Comment</button>
+  <button id="logout" onclick="logout()">Log out</button>
+
+  <div id="commentList"></div>
+</div>
+
+<script>
+  // 🔑 Supabase connection
+  const supabase = supabase.createClient(
+    "YOUR_SUPABASE_URL",
+    "YOUR_ANON_KEY"
+  );
+
+  // 📌 Story ID from URL (?story=story-123)
+  const storyId = new URLSearchParams(window.location.search).get("story");
+
+  if (!storyId) {
+    document.body.innerHTML = "<p>Missing story ID.</p>";
+  }
+
+  // 🔍 Check login status
+  async function checkUser() {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      showAuth();
+    } else {
+      showComments();
+      loadComments();
+    }
+  }
+
+  // 🔐 Auth UI
+  function showAuth() {
+    document.getElementById("auth").innerHTML = `
+      <input id="email" type="email" placeholder="Email">
+      <input id="password" type="password" placeholder="Password">
+      <button onclick="login()">Log in</button>
+      <button onclick="signup()">Sign up</button>
+    `;
+  }
+
+  async function signup() {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+
+    const { error } = await supabase.auth.signUp({ email, password });
+
+    if (error) {
+      alert(error.message);
+    } else {
+      alert("Check your email to confirm your account.");
+    }
+  }
+
+  async function login() {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      alert(error.message);
+    } else {
+      checkUser();
+    }
+  }
+
+  async function logout() {
+    await supabase.auth.signOut();
+    location.reload();
+  }
+
+  // 💬 Post comment
+  async function postComment() {
+    const comment = document.getElementById("commentInput").value.trim();
+    if (!comment) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const { error } = await supabase.from("story_comments").insert({
+      story_id: storyId,
+      content: comment,
+      user_id: user.id
+    });
+
+    if (error) {
+      alert(error.message);
+    } else {
+      document.getElementById("commentInput").value = "";
+      loadComments();
+    }
+  }
+
+  // 📥 Load comments
+  async function loadComments() {
+    const { data, error } = await supabase
+      .from("story_comments")
+      .select("content, created_at")
+      .eq("story_id", storyId)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    const list = document.getElementById("commentList");
+    list.innerHTML = "";
+
+    data.forEach(c => {
+      const div = document.createElement("div");
+      div.className = "comment";
+      div.innerHTML = `
+        <div>${escapeHtml(c.content)}</div>
+        <div class="meta">${new Date(c.created_at).toLocaleString()}</div>
+      `;
+      list.appendChild(div);
+    });
+  }
+
+  // 🛡️ Prevent XSS
+  function escapeHtml(text) {
+    return text.replace(/[&<>"']/g, m => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;"
+    }[m]));
+  }
+
+  // 🚀 Start app
+  checkUser();
+</script>
+
+</body>
+</html>
