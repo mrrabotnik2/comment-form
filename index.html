@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>Comments</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+
   <!-- Supabase JS library -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
@@ -28,6 +28,7 @@
   <textarea id="commentInput" placeholder="Write a comment..."></textarea>
   <button onclick="postComment()">Post Comment</button>
   <button id="logout" onclick="logout()">Log out</button>
+
   <div id="commentList"></div>
 </div>
 
@@ -38,11 +39,11 @@
     "sb_publishable_-rGnPqFMdXSVXmKdI2bCow_R7uuC53z"
   );
 
-  // Story ID from URL
+  // Get story ID from URL
   const storyId = new URLSearchParams(window.location.search).get("story");
   if (!storyId) document.body.innerHTML = "<p>Missing story ID.</p>";
 
-  // Escape HTML to prevent XSS
+  // Escape HTML
   function escapeHtml(text) {
     return text.replace(/[&<>"']/g, m => ({
       "&": "&amp;",
@@ -53,7 +54,7 @@
     }[m]));
   }
 
-  // Show login/signup form
+  // Show login/signup
   function showAuth() {
     document.getElementById("auth").innerHTML = `
       <input id="email" type="email" placeholder="Email">
@@ -113,7 +114,7 @@
     location.reload();
   }
 
-  // Post a comment
+  // Post comment
   async function postComment() {
     const comment = document.getElementById("commentInput").value.trim();
     if (!comment) return;
@@ -134,7 +135,7 @@
   async function loadComments() {
     const { data, error } = await supabaseClient
       .from("story_comments")
-      .select("content, created_at, users(nickname)") // join with users
+      .select("content, created_at, users(nickname)")
       .eq("story_id", storyId)
       .order("created_at", { ascending: true });
 
