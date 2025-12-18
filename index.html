@@ -4,46 +4,18 @@
   <meta charset="UTF-8">
   <title>Comments</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+  
   <!-- Supabase JS library -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 600px;
-      margin: auto;
-      padding: 10px;
-    }
-
-    input, textarea, button {
-      width: 100%;
-      margin-top: 6px;
-      padding: 8px;
-    }
-
-    textarea {
-      min-height: 80px;
-    }
-
-    button {
-      cursor: pointer;
-    }
-
-    .comment {
-      border-bottom: 1px solid #ddd;
-      padding: 8px 0;
-    }
-
-    .meta {
-      font-size: 0.8em;
-      color: #666;
-    }
-
-    #logout {
-      margin-top: 10px;
-      background: #eee;
-    }
+    body { font-family: Arial; max-width: 600px; margin: auto; padding: 10px; }
+    input, textarea, button { width: 100%; margin-top: 6px; padding: 8px; }
+    textarea { min-height: 80px; }
+    button { cursor: pointer; }
+    .comment { border-bottom: 1px solid #ddd; padding: 8px 0; }
+    .meta { font-size: 0.8em; color: #666; }
+    #logout { margin-top: 10px; background: #eee; }
   </style>
 </head>
 <body>
@@ -56,7 +28,6 @@
   <textarea id="commentInput" placeholder="Write a comment..."></textarea>
   <button onclick="postComment()">Post Comment</button>
   <button id="logout" onclick="logout()">Log out</button>
-
   <div id="commentList"></div>
 </div>
 
@@ -67,11 +38,9 @@
     "sb_publishable_-rGnPqFMdXSVXmKdI2bCow_R7uuC53z"
   );
 
-  // Get story ID from URL
+  // Story ID from URL
   const storyId = new URLSearchParams(window.location.search).get("story");
-  if (!storyId) {
-    document.body.innerHTML = "<p>Missing story ID.</p>";
-  }
+  if (!storyId) document.body.innerHTML = "<p>Missing story ID.</p>";
 
   // Escape HTML to prevent XSS
   function escapeHtml(text) {
@@ -101,57 +70,41 @@
     document.getElementById("commentsSection").style.display = "block";
   }
 
-  // Check current user session
+  // Check current user
   async function checkUser() {
     const { data: { user } } = await supabaseClient.auth.getUser();
-    if (!user) {
-      showAuth();
-    } else {
-      showComments();
-      loadComments();
-    }
+    if (!user) showAuth();
+    else { showComments(); loadComments(); }
   }
 
-  // Signup with nickname
+  // Signup
   async function signup() {
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
     const nickname = document.getElementById("nickname").value.trim();
 
-    if (!nickname) {
-      alert("Please enter a nickname.");
-      return;
-    }
+    if (!nickname) { alert("Enter a nickname"); return; }
 
-    const { user, error } = await supabaseClient.auth.signUp({ email, password });
-    if (error) {
-      alert(error.message);
-      return;
-    }
+    const { data: { user }, error } = await supabaseClient.auth.signUp({ email, password });
+    if (error) { alert(error.message); return; }
 
-    // Add nickname to users table
+    // Insert nickname into users table
     const { error: updateError } = await supabaseClient
       .from("users")
-      .upsert({ id: user.id, nickname: nickname });
+      .upsert({ id: user.id, nickname });
 
-    if (updateError) {
-      alert(updateError.message);
-    } else {
-      alert("Check your email to confirm your account.");
-    }
+    if (updateError) alert(updateError.message);
+    else alert("Check your email to confirm account");
   }
 
-  // Login existing user
+  // Login
   async function login() {
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
 
     const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (error) {
-      alert(error.message);
-    } else {
-      checkUser();
-    }
+    if (error) alert(error.message);
+    else checkUser();
   }
 
   // Logout
@@ -173,26 +126,19 @@
       user_id: user.id
     });
 
-    if (error) {
-      alert(error.message);
-    } else {
-      document.getElementById("commentInput").value = "";
-      loadComments();
-    }
+    if (error) alert(error.message);
+    else { document.getElementById("commentInput").value = ""; loadComments(); }
   }
 
   // Load comments with nickname
   async function loadComments() {
     const { data, error } = await supabaseClient
       .from("story_comments")
-      .select("content, created_at, users(nickname)")
+      .select("content, created_at, users(nickname)") // join with users
       .eq("story_id", storyId)
       .order("created_at", { ascending: true });
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
+    if (error) { alert(error.message); return; }
 
     const list = document.getElementById("commentList");
     list.innerHTML = "";
@@ -208,7 +154,7 @@
     });
   }
 
-  // Start app
+  // Start
   checkUser();
 </script>
 
