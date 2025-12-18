@@ -5,7 +5,7 @@
   <title>Comments</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Supabase JS -->
+  <!-- Supabase JS library -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
   <style>
@@ -61,22 +61,22 @@
 </div>
 
 <script>
-  // 🔑 Supabase connection (YOUR Supabase Project URL + Anon Key)
-  const supabase = supabase.createClient(
+  // 🔑 Supabase connection (your Project URL + anon key)
+  const supabaseClient = supabase.createClient(
     "https://pidzgdrdgqgsayfoxqba.supabase.co",
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZHpnZHJkZ3Fnc2F5Zm94cWJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NDI1OTcsImV4cCI6MjA4MTIxODU5N30.6sNn3jbNVfl-MEowIEjUknEKHlOcfKvVRa5pFqCHiw0"
   );
 
-  // 📌 Story ID from URL (?story=story-123)
+  // Get story ID from URL
   const storyId = new URLSearchParams(window.location.search).get("story");
 
   if (!storyId) {
     document.body.innerHTML = "<p>Missing story ID.</p>";
   }
 
-  // 🔍 Check login status
+  // Check login status
   async function checkUser() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await supabaseClient.auth.getUser();
 
     if (!user) {
       showAuth();
@@ -86,7 +86,7 @@
     }
   }
 
-  // 🔐 Auth UI
+  // Show login/signup form
   function showAuth() {
     document.getElementById("auth").innerHTML = `
       <input id="email" type="email" placeholder="Email">
@@ -100,7 +100,7 @@
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
 
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabaseClient.auth.signUp({ email, password });
 
     if (error) {
       alert(error.message);
@@ -113,7 +113,7 @@
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
 
     if (error) {
       alert(error.message);
@@ -123,18 +123,18 @@
   }
 
   async function logout() {
-    await supabase.auth.signOut();
+    await supabaseClient.auth.signOut();
     location.reload();
   }
 
-  // 💬 Post comment
+  // Post a comment
   async function postComment() {
     const comment = document.getElementById("commentInput").value.trim();
     if (!comment) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await supabaseClient.auth.getUser();
 
-    const { error } = await supabase.from("story_comments").insert({
+    const { error } = await supabaseClient.from("story_comments").insert({
       story_id: storyId,
       content: comment,
       user_id: user.id
@@ -148,9 +148,9 @@
     }
   }
 
-  // 📥 Load comments
+  // Load comments
   async function loadComments() {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("story_comments")
       .select("content, created_at")
       .eq("story_id", storyId)
@@ -175,7 +175,7 @@
     });
   }
 
-  // 🛡️ Prevent XSS
+  // Prevent XSS
   function escapeHtml(text) {
     return text.replace(/[&<>"']/g, m => ({
       "&": "&amp;",
@@ -186,7 +186,13 @@
     }[m]));
   }
 
-  // 🚀 Start app
+  // Show comments section
+  function showComments() {
+    document.getElementById("auth").style.display = "none";
+    document.getElementById("commentsSection").style.display = "block";
+  }
+
+  // Start app
   checkUser();
 </script>
 
