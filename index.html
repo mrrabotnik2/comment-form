@@ -86,16 +86,14 @@
 
     if (!nickname) { alert("Enter a nickname"); return; }
 
-    const { data: { user }, error } = await supabaseClient.auth.signUp({ email, password });
-    if (error) { alert(error.message); return; }
+    const { error } = await supabaseClient.auth.signUp({ email, password });
 
-    // Insert nickname into users table
-    const { error: updateError } = await supabaseClient
-      .from("users")
-      .upsert({ id: user.id, nickname });
+    if (error) {
+      alert(error.message);
+      return;
+    }
 
-    if (updateError) alert(updateError.message);
-    else alert("Check your email to confirm account");
+    alert("Check your email to confirm your account.");
   }
 
   // Login
@@ -153,6 +151,21 @@
       `;
       list.appendChild(div);
     });
+  }
+
+  // Update nickname after first login
+  async function updateNickname(user) {
+    const nickname = document.getElementById("nickname").value.trim();
+    if (nickname) {
+      const { error } = await supabaseClient
+        .from("users")
+        .upsert({ id: user.id, nickname });
+
+      if (error) {
+        alert("Error saving nickname.");
+        return;
+      }
+    }
   }
 
   // Start
