@@ -6,30 +6,26 @@
     <title>Story Comments</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* Modern, clean look for Google Sites */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: sans-serif; background: #f9f9fb; padding: 10px; }
-        .container { max-width: 500px; margin: 0 auto; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        input, textarea, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 5px; border: 1px solid #ddd; }
         
-        /* THE ORANGE BUTTONS */
-        button { 
-            background: #FF8C00; /* Dark Orange */
-            color: white; 
-            border: none; 
-            font-weight: bold; 
-            cursor: pointer; 
-            transition: background 0.2s;
-        }
-        button:hover {
-            background: #E67E00; /* Slightly darker orange on hover */
-        }
-        #btn-signup {
-            background: #FF8C00; /* Keeping signup consistent with post button */
+        .container { 
+            max-width: 500px; 
+            margin: 20px auto; /* "auto" centers the box horizontally */
+            background: #fff; 
+            padding: 15px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
         }
 
+        /* Original Blue Theme */
+        input, textarea, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 5px; border: 1px solid #ddd; outline: none; }
+        button { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+
         .comment { border-bottom: 1px solid #eee; padding: 10px 0; font-size: 14px; }
-        .author { font-weight: bold; color: #FF8C00; } /* Orange name links */
+        .author { font-weight: bold; color: #007bff; }
         .hidden { display: none; }
         #status-bar { font-size: 12px; margin-bottom: 10px; color: #666; }
     </style>
@@ -41,22 +37,22 @@
         <div id="auth-ui">
             <input type="email" id="email" placeholder="Email">
             <input type="password" id="password" placeholder="Password">
-            <input type="text" id="nick" placeholder="Display Name (First time only)">
+            <input type="text" id="nick" placeholder="Display Name">
             <button id="btn-signup">Create Account</button>
-            <button id="btn-login">Log In</button>
+            <button id="btn-login" style="background:none; color:#007bff; margin-top:5px; border:1px solid #007bff;">Log In</button>
         </div>
 
         <div id="comment-ui" class="hidden">
-            <div style="display:flex; justify-content:space-between; font-size:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:5px;">
                 <span id="welcome-msg"></span>
-                <a href="#" id="btn-logout" style="color: #666;">Log Out</a>
+                <a href="#" id="btn-logout" style="color: #666; text-decoration: none;">[Log Out]</a>
             </div>
-            <textarea id="msg" placeholder="Write a comment..."></textarea>
+            <textarea id="msg" rows="3" placeholder="Write a comment..."></textarea>
             <button id="btn-post">Post Comment</button>
         </div>
 
         <div id="list" style="margin-top:20px;">
-            <strong>Comments</strong>
+            <strong style="font-size: 15px;">Community Comments</strong>
             <div id="comments-box" style="margin-top:10px;">Loading...</div>
         </div>
     </div>
@@ -66,45 +62,72 @@
             url: 'https://pidzgdrdgqgsayfoxqba.supabase.co',
             key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZHpnZHJkZ3Fnc2F5Zm94cWJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NDI1OTcsImV4cCI6MjA4MTIxODU5N30.6sNn3jbNVfl-MEowIEjUknEKHlOcfKvVRa5pFqCHiw0'
         };
+
         const supabase = window.supabase.createClient(CONFIG.url, CONFIG.key);
         const storyId = new URLSearchParams(window.location.search).get('story') || 'default';
 
         async function init() {
-            const { data: { session } } = await supabase.auth.getSession();
-            updateUI(session?.user);
-            loadComments();
-            supabase.auth.onAuthStateChange((_event, session) => updateUI(session?.user));
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                updateUI(session?.user);
+                loadComments();
+
+                supabase.auth.onAuthStateChange((_event, session) => {
+                    updateUI(session?.user);
+                });
+            } catch (e) {
+                document.getElementById('status-bar').textContent = "Connection Error";
+            }
         }
 
         function updateUI(user) {
-            document.getElementById('auth-ui').classList.toggle('hidden', !!user);
-            document.getElementById('comment-ui').classList.toggle('hidden', !user);
+            const authUi = document.getElementById('auth-ui');
+            const commUi = document.getElementById('comment-ui');
+            const status = document.getElementById('status-bar');
+
             if (user) {
-                document.getElementById('welcome-msg').textContent = "Hi, " + (user.user_metadata.nickname || user.email);
-                document.getElementById('status-bar').textContent = "Logged in to: " + storyId;
+                authUi.classList.add('hidden');
+                commUi.classList.remove('hidden');
+                document.getElementById('welcome-msg').textContent = "User: " + (user.user_metadata.nickname || user.email.split('@')[0]);
+                status.textContent = "✅ Connected to: " + storyId;
+            } else {
+                authUi.classList.remove('hidden');
+                commUi.classList.add('hidden');
+                status.textContent = "Sign in to leave a comment.";
             }
         }
 
         document.getElementById('btn-signup').onclick = async () => {
-            const email = document.getElementById('email').value;
+            const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
-            const nickname = document.getElementById('nick').value;
-            const { error } = await supabase.auth.signUp({ email, password, options: { data: { nickname } } });
+            const nickname = document.getElementById('nick').value.trim();
+            if(!email || !password || !nickname) return alert("Please fill all fields");
+
+            const { error } = await supabase.auth.signUp({ 
+                email, 
+                password, 
+                options: { data: { nickname } } 
+            });
             if(error) alert(error.message);
+            else alert("Success! You are now logged in.");
         };
 
         document.getElementById('btn-login').onclick = async () => {
-            const { error } = await supabase.auth.signInWithPassword({ 
-                email: document.getElementById('email').value, 
-                password: document.getElementById('password').value 
-            });
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const { error } = await supabase.auth.signInWithPassword({ email, password });
             if(error) alert(error.message);
         };
 
-        document.getElementById('btn-logout').onclick = () => supabase.auth.signOut();
+        document.getElementById('btn-logout').onclick = (e) => {
+            e.preventDefault();
+            supabase.auth.signOut();
+        };
 
         document.getElementById('btn-post').onclick = async () => {
-            const content = document.getElementById('msg').value;
+            const content = document.getElementById('msg').value.trim();
+            if(!content) return;
+
             const { data: { user } } = await supabase.auth.getUser();
             const { error } = await supabase.from('story_comments').insert({
                 content,
@@ -112,17 +135,32 @@
                 user_id: user.id,
                 nickname: user.user_metadata.nickname || 'Guest'
             });
-            if(error) alert(error.message);
-            else { document.getElementById('msg').value = ''; loadComments(); }
+
+            if(error) alert("Error: " + error.message);
+            else {
+                document.getElementById('msg').value = '';
+                loadComments();
+            }
         };
 
         async function loadComments() {
-            const { data } = await supabase.from('story_comments').select('*').eq('story_id', storyId).order('created_at', {ascending: false});
-            document.getElementById('comments-box').innerHTML = data?.map(c => `
-                <div class="comment">
-                    <span class="author" style="color:#FF8C00">${c.nickname || 'Guest'}:</span> ${c.content}
-                </div>
-            `).join('') || "No comments yet.";
+            const box = document.getElementById('comments-box');
+            const { data, error } = await supabase
+                .from('story_comments')
+                .select('*')
+                .eq('story_id', storyId)
+                .order('created_at', { ascending: false });
+
+            if(error) {
+                box.textContent = "Error loading comments.";
+            } else {
+                box.innerHTML = data.length ? data.map(c => `
+                    <div class="comment">
+                        <div class="author">${c.nickname || 'Guest'}</div>
+                        <div>${c.content}</div>
+                    </div>
+                `).join('') : "No comments yet.";
+            }
         }
 
         init();
