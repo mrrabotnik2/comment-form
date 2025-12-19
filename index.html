@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sign Up / Login - Supabase</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -27,7 +27,7 @@
       border-radius: 8px;
     }
 
-    h2 {
+    h2, h3 {
       text-align: center;
     }
 
@@ -41,12 +41,14 @@
     }
 
     .form-group input,
+    .form-group textarea,
     .form-group button {
       width: 100%;
       padding: 10px;
       margin: 5px 0;
       border: 1px solid #ddd;
       border-radius: 4px;
+      box-sizing: border-box;
     }
 
     .form-group button {
@@ -64,8 +66,27 @@
       text-align: center;
     }
 
+    .success {
+      color: green;
+      text-align: center;
+    }
+
     #comment-form {
       display: none;
+    }
+
+    .comment {
+      border-bottom: 1px solid #eee;
+      padding: 10px 0;
+    }
+
+    .author {
+      font-weight: bold;
+    }
+
+    .timestamp {
+      font-size: 0.8em;
+      color: #666;
     }
   </style>
 </head>
@@ -92,9 +113,10 @@
     </div>
 
     <p class="error" id="auth-error"></p>
+    <p class="success" id="auth-success"></p>
   </div>
 
-  <!-- Comment Form (will show after login) -->
+  <!-- Comment Form (shows only after login) -->
   <div id="comment-form">
     <h3>Leave a Comment</h3>
     <div class="form-group">
@@ -102,15 +124,18 @@
       <textarea id="comment" placeholder="Write your comment here" required></textarea>
     </div>
     <button id="submit-comment-btn">Submit Comment</button>
-    <div class="comment-list" id="comment-list"></div>
   </div>
+
+  <!-- Comments List (always visible to everyone) -->
+  <h3>Comments</h3>
+  <div class="comment-list" id="comment-list"></div>
 </div>
 
 <script>
-  // Initialize Supabase client
-  const supabase = supabase.createClient(
-    "https://pidzgdrdgqgsayfoxqba.supabase.co", // Your Supabase URL
-    "sb_publishable_-rGnPqFMdXSVXmKdI2bCow_R7uuC53z" // Your Supabase Anon Public Key
+  // Initialize Supabase client with your provided key
+  const supabase = Supabase.createClient(
+    "https://pidzgdrdgqgsayfoxqba.supabase.co",
+    "sb_publishable_-rGnPqFMdXSVXmKdI2bCow_R7uuC53z"
   );
 
   const emailInput = document.getElementById('email');
@@ -118,82 +143,91 @@
   const signupBtn = document.getElementById('signup-btn');
   const loginBtn = document.getElementById('login-btn');
   const authError = document.getElementById('auth-error');
+  const authSuccess = document.getElementById('auth-success');
   const commentForm = document.getElementById('comment-form');
   const commentInput = document.getElementById('comment');
   const submitCommentBtn = document.getElementById('submit-comment-btn');
   const commentList = document.getElementById('comment-list');
   const authForm = document.getElementById('auth-form');
 
-  // Sign Up Button Handler
-  signupBtn.onclick = async () => {
-    const email = emailInput.value;
+  // Use current page URL for redirect after email confirmation
+  const redirectUrl = window.location.href;
+
+  // Sign Up
+  signupBtn.addEventListener('click', async () => {
+    authError.textContent = '';
+    authSuccess.textContent = '';
+    const email = emailInput.value.trim();
     const password = passwordInput.value;
 
-    // Sign up the user
-    const { user, error } = await supabase.auth.signUp({ email, password });
-
-    if (error) {
-      authError.textContent = error.message;
+    if (!email || !password) {
+      authError.textContent = 'Please enter email and password';
       return;
     }
 
-    // If no error, show confirmation message
-    authError.textContent = 'Please check your email for the confirmation link.';
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectUrl
+      }
+    });
 
-    // Trigger the confirmation email
-    const { data, errorEmail } = await supabase.auth.api.sendVerificationEmail(user.email);
-
-    if (errorEmail) {
-      console.log("Error resending confirmation email:", errorEmail.message);
+    if (error) {
+      authError.textContent = error.message;
     } else {
-      console.log("Confirmation email resent to:", user.email);
+      authSuccess.textContent = 'Sign up successful! Check your email for the confirmation link.';
+      emailInput.value = '';
+      passwordInput.value = '';
     }
-  };
+  });
 
-  // Log In Button Handler
-  loginBtn.onclick = async () => {
-    const email = emailInput.value;
+  // Log In
+  loginBtn.addEventListener('click', async () => {
+    authError.textContent = '';
+    authSuccess.textContent = '';
+    const email = emailInput.value.trim();
     const password = passwordInput.value;
 
-    // Log in the user
-    const { user, error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) {
-      authError.textContent = error.message;
+    if (!email || !password) {
+      authError.textContent = 'Please enter email and password';
       return;
     }
 
-    authError.textContent = ''; // Clear error
-    authForm.style.display = 'none'; // Hide sign-up/login form
-    commentForm.style.display = 'block'; // Show comment form
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
 
-    loadComments(); // Load comments for the story
-  };
-
-  // Submit Comment Handler
-  submitCommentBtn.onclick = async () => {
-    const commentContent = commentInput.value;
-    const user = supabase.auth.user();
-    if (!commentContent) {
-      return alert("Please write something in your comment!");
+    if (error) {
+      authError.textContent = error.message;
+    } else {
+      passwordInput.value = '';
+      // Success handled by onAuthStateChange
     }
-    if (!user) {
-      return alert("You need to be logged in to post a comment!");
-    }
+  });
 
-    const { data, error } = await supabase
+  // Submit Comment
+  submitCommentBtn.addEventListener('click', async () => {
+    const commentContent = commentInput.value.trim();
+    if (!commentContent) return alert("Please write a comment!");
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return alert("You must be logged in to comment!");
+
+    const { error } = await supabase
       .from("story_comments")
       .insert([{ content: commentContent, user_id: user.id, story_id: "test" }]);
 
     if (error) {
-      return alert(error.message);
+      alert(error.message);
+    } else {
+      commentInput.value = '';
+      loadComments();
     }
+  });
 
-    commentInput.value = ''; // Clear the comment input
-    loadComments(); // Reload comments after submission
-  };
-
-  // Load Comments for the Story
+  // Load Comments (visible to everyone)
   async function loadComments() {
     const { data, error } = await supabase
       .from("story_comments")
@@ -203,40 +237,40 @@
 
     if (error) {
       console.error(error);
+      commentList.innerHTML = '<p>Error loading comments.</p>';
+      return;
+    }
+
+    if (data.length === 0) {
+      commentList.innerHTML = '<p>No comments yet. Be the first!</p>';
       return;
     }
 
     commentList.innerHTML = data.map(comment => `
       <div class="comment">
-        <div class="author">${comment.users.nickname || 'Anonymous'}</div>
+        <div class="author">${comment.users?.nickname || 'Anonymous'}</div>
         <div class="content">${comment.content}</div>
         <div class="timestamp">${new Date(comment.created_at).toLocaleString()}</div>
       </div>
     `).join('');
   }
 
-  // Automatically check if user is logged in
-  supabase.auth.onAuthStateChange((event, session) => {
-    if (session?.user) {
+  // Auth State Listener
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    if (session) {
       authForm.style.display = 'none';
       commentForm.style.display = 'block';
-      loadComments();
+      authSuccess.textContent = `Welcome, ${session.user.email}!`;
     } else {
       authForm.style.display = 'block';
       commentForm.style.display = 'none';
+      authSuccess.textContent = '';
     }
+    loadComments();
   });
 
-  // Check if the user is logged in on page load
-  async function checkLoginStatus() {
-    const session = supabase.auth.session();
-    if (session?.user) {
-      authForm.style.display = 'none';
-      commentForm.style.display = 'block';
-      loadComments();
-    }
-  }
-  checkLoginStatus();
+  // Initial load
+  loadComments();
 </script>
 
 </body>
