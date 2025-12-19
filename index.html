@@ -17,12 +17,22 @@ button:hover { background:#45a049; }
 .author { font-weight:bold; }
 .timestamp { font-size:12px; color:#666; }
 #comment-form { display:none; margin-top:15px; }
+#debug-info { font-size:12px; color:#666; background:#f0f0f0; padding:10px; margin-top:10px; border-radius:4px; }
+.status-confirmed { color:green; }
+.status-pending { color:orange; }
+.status-not-logged-in { color:red; }
 </style>
 </head>
 <body>
 
 <div class="container">
 <h2>Comments</h2>
+
+<!-- DEBUG INFO -->
+<div id="debug-info">
+    <strong>Status:</strong> <span id="debug-status">Loading...</span><br>
+    <span id="debug-details"></span>
+</div>
 
 <!-- AUTH FORM -->
 <div id="auth-form">
@@ -31,276 +41,449 @@ button:hover { background:#45a049; }
   <input id="nickname" placeholder="Choose a nickname (new users only)">
   <button id="signup-btn">Sign Up</button>
   <button id="login-btn">Log In</button>
+  <button id="logout-btn" style="background:#888; display:none;">Log Out</button>
   <p id="auth-error" class="error"></p>
   <p id="auth-success" class="success"></p>
 </div>
 
 <!-- COMMENT FORM -->
 <div id="comment-form">
+  <p id="comment-instruction">Post your comment below:</p>
   <textarea id="comment" rows="4" placeholder="Write your comment..."></textarea>
   <button id="submit-comment-btn">Post Comment</button>
+  <p id="comment-error" class="error" style="display:none;"></p>
 </div>
 
 <div id="comment-list"></div>
 </div>
 
 <script>
-// =================== IMMEDIATE EXECUTION PREVENTION ===================
-// If this script has already run, STOP immediately
-if (window.commentsAppLoaded) {
-    console.warn('Comments app already loaded, stopping duplicate execution');
-    // If we're here, the page is loading this script twice
-    // Let's clean up and exit
-    throw new Error('Script already executed');
+// =================== INITIALIZATION ===================
+const SUPABASE_URL = "https://pidzgdrdgqgsayfoxqba.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZHpnZHJkZ3Fnc2F5Zm94cWJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NDI1OTcsImV4cCI6MjA4MTIxODU5N30.6sNn3jbNVfl-MEowIEjUknEKHlOcfKvVRa5pFqCHiw0";
+
+let supabase;
+try {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log("✅ Supabase initialized");
+} catch (error) {
+    console.error("❌ Supabase init error:", error);
+    updateDebugInfo("error", "Failed to initialize database");
+    throw error;
 }
 
-// Mark as loaded IMMEDIATELY
-window.commentsAppLoaded = true;
+// =================== ELEMENTS ===================
+const storyId = new URLSearchParams(window.location.search).get("story") || "default";
+const emailEl = document.getElementById("email");
+const passwordEl = document.getElementById("password");
+const nicknameEl = document.getElementById("nickname");
+const authForm = document.getElementById("auth-form");
+const commentForm = document.getElementById("comment-form");
+const commentInput = document.getElementById("comment");
+const commentList = document.getElementById("comment-list");
+const errorEl = document.getElementById("auth-error");
+const successEl = document.getElementById("auth-success");
+const commentErrorEl = document.getElementById("comment-error");
+const commentInstruction = document.getElementById("comment-instruction");
+const debugStatus = document.getElementById("debug-status");
+const debugDetails = document.getElementById("debug-details");
+const logoutBtn = document.getElementById("logout-btn");
 
-// =================== SINGLE INITIALIZATION ===================
-// Use var instead of const/let to avoid duplicate declaration errors
-var supabase;
-var storyCommentsApp = {};
+// =================== DEBUG FUNCTIONS ===================
+function updateDebugInfo(status, details) {
+    debugStatus.textContent = status;
+    debugStatus.className = `status-${status.toLowerCase().replace(/\s+/g, '-')}`;
+    debugDetails.textContent = details;
+    console.log(`DEBUG: ${status} - ${details}`);
+}
 
-// Only initialize if not already done
-if (!window.supabaseClient) {
-    const SUPABASE_URL = "https://pidzgdrdgqgsayfoxqba.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZHpnZHJkZ3Fnc2F5Zm94cWJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NDI1OTcsImV4cCI6MjA4MTIxODU5N30.6sNn3jbNVfl-MEowIEjUknEKHlOcfKvVRa5pFqCHiw0";
+// =================== EVENT LISTENERS ===================
+document.getElementById("signup-btn").addEventListener("click", handleSignup);
+document.getElementById("login-btn").addEventListener("click", handleLogin);
+document.getElementById("logout-btn").addEventListener("click", handleLogout);
+document.getElementById("submit-comment-btn").addEventListener("click", handleCommentSubmit);
 
+// =================== SIGNUP WITH DEBUG ===================
+async function handleSignup() {
+    errorEl.textContent = "";
+    successEl.textContent = "";
+    
+    const email = emailEl.value.trim();
+    const password = passwordEl.value;
+    const nickname = nicknameEl.value.trim();
+    
+    if (!email || !password || !nickname) {
+        errorEl.textContent = "Please fill all fields";
+        return;
+    }
+    
+    if (password.length < 6) {
+        errorEl.textContent = "Password must be at least 6 characters";
+        return;
+    }
+    
+    updateDebugInfo("processing", "Creating account...");
+    
+    const btn = document.getElementById("signup-btn");
+    btn.disabled = true;
+    btn.textContent = "Signing up...";
+    
     try {
-        window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        console.log("Supabase client initialized");
-    } catch (error) {
-        console.error("Failed to initialize Supabase:", error);
-        document.body.innerHTML = '<div class="container"><h2>System Error</h2><p class="error">Failed to load comments system. Please refresh.</p></div>';
-        throw error;
+        console.log("📧 Attempting signup for:", email);
+        
+        // IMPORTANT: Use the exact URL where users will click the confirmation link
+        const { data, error } = await supabase.auth.signUp({
+            email: email,
+            password: password,
+            options: {
+                data: { nickname: nickname },
+                emailRedirectTo: window.location.origin  // This should be https://comments.mystoriesandtales.com
+            }
+        });
+        
+        console.log("📨 Signup response:", { data, error });
+        
+        if (error) {
+            errorEl.textContent = error.message;
+            updateDebugInfo("error", `Signup failed: ${error.message}`);
+        } else {
+            updateDebugInfo("success", "Account created! Check email for confirmation.");
+            
+            if (data.user) {
+                // Show user details in debug
+                console.log("👤 User created:", {
+                    id: data.user.id,
+                    email: data.user.email,
+                    confirmed: data.user.email_confirmed_at,
+                    metadata: data.user.user_metadata
+                });
+                
+                // Create profile
+                try {
+                    const { error: profileError } = await supabase
+                        .from('profiles')
+                        .upsert({
+                            id: data.user.id,
+                            nickname: nickname,
+                            email: email,
+                            created_at: new Date().toISOString()
+                        });
+                    
+                    if (profileError) {
+                        console.log("ℹ️ Profile note:", profileError.message);
+                    }
+                } catch (profileErr) {
+                    console.log("ℹ️ Profile creation:", profileErr.message);
+                }
+                
+                successEl.innerHTML = `
+                    ✅ <strong>Sign up successful!</strong><br>
+                    We've sent a confirmation email to:<br>
+                    <strong>${email}</strong><br>
+                    <small>Check your inbox (and spam folder) for the confirmation link.</small>
+                `;
+                
+                localStorage.setItem('lastEmail', email);
+                passwordEl.value = "";
+                
+                // Update UI based on confirmation status
+                if (data.user.email_confirmed_at) {
+                    updateDebugInfo("confirmed", "Email already confirmed!");
+                    authForm.style.display = 'none';
+                    commentForm.style.display = 'block';
+                } else {
+                    updateDebugInfo("pending", "Waiting for email confirmation...");
+                }
+            }
+        }
+    } catch (err) {
+        errorEl.textContent = "Network error. Please try again.";
+        updateDebugInfo("error", `Network error: ${err.message}`);
+        console.error("❌ Signup catch error:", err);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Sign Up";
     }
 }
 
-// Use the global instance
-supabase = window.supabaseClient;
+// =================== LOGIN ===================
+async function handleLogin() {
+    errorEl.textContent = "";
+    successEl.textContent = "";
+    
+    const email = emailEl.value.trim();
+    const password = passwordEl.value;
+    
+    if (!email || !password) {
+        errorEl.textContent = "Please enter email and password";
+        return;
+    }
+    
+    updateDebugInfo("processing", "Logging in...");
+    
+    const btn = document.getElementById("login-btn");
+    btn.disabled = true;
+    btn.textContent = "Logging in...";
+    
+    try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email: email,
+            password: password
+        });
+        
+        if (error) {
+            errorEl.textContent = error.message;
+            updateDebugInfo("error", `Login failed: ${error.message}`);
+        } else {
+            updateDebugInfo("success", `Logged in as ${email}`);
+            successEl.textContent = "Login successful!";
+            localStorage.setItem('lastEmail', email);
+            passwordEl.value = "";
+        }
+    } catch (err) {
+        errorEl.textContent = "Network error. Please try again.";
+        updateDebugInfo("error", `Network error: ${err.message}`);
+        console.error(err);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Log In";
+    }
+}
 
-// =================== MAIN APPLICATION ===================
-(function() {
-    'use strict';
+// =================== LOGOUT ===================
+async function handleLogout() {
+    try {
+        await supabase.auth.signOut();
+        updateDebugInfo("logged-out", "Successfully logged out");
+    } catch (err) {
+        console.error("Logout error:", err);
+    }
+}
+
+// =================== POST COMMENT ===================
+async function handleCommentSubmit() {
+    const content = commentInput.value.trim();
+    if (!content) {
+        showCommentError("Please write a comment!");
+        return;
+    }
     
-    // Store element references in our app object
-    storyCommentsApp.elements = {
-        storyId: new URLSearchParams(window.location.search).get("story") || "default",
-        emailEl: document.getElementById("email"),
-        passwordEl: document.getElementById("password"),
-        nicknameEl: document.getElementById("nickname"),
-        authForm: document.getElementById("auth-form"),
-        commentForm: document.getElementById("comment-form"),
-        commentInput: document.getElementById("comment"),
-        commentList: document.getElementById("comment-list"),
-        errorEl: document.getElementById("auth-error"),
-        successEl: document.getElementById("auth-success")
-    };
+    updateDebugInfo("processing", "Posting comment...");
     
-    const els = storyCommentsApp.elements;
+    const btn = document.getElementById("submit-comment-btn");
+    btn.disabled = true;
+    btn.textContent = "Posting...";
+    commentErrorEl.style.display = 'none';
     
-    // =================== EVENT HANDLERS ===================
-    storyCommentsApp.handleSignup = async function() {
-        els.errorEl.textContent = "";
-        els.successEl.textContent = "";
-    
-        if (!els.emailEl.value || !els.passwordEl.value || !els.nicknameEl.value) {
-            els.errorEl.textContent = "Please fill all fields";
+    try {
+        // 1. Get current user
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError) {
+            showCommentError("Session error. Please log in again.");
+            updateDebugInfo("error", "Session expired");
+            authForm.style.display = 'block';
+            commentForm.style.display = 'none';
             return;
         }
-    
-        if (els.passwordEl.value.length < 6) {
-            els.errorEl.textContent = "Password must be at least 6 characters";
+        
+        if (!user) {
+            showCommentError("Please log in to comment.");
+            updateDebugInfo("not-logged-in", "No user session");
+            authForm.style.display = 'block';
+            commentForm.style.display = 'none';
             return;
         }
-    
-        try {
-            const { data, error } = await supabase.auth.signUp({
-                email: els.emailEl.value.trim(),
-                password: els.passwordEl.value,
-                options: {
-                    data: { nickname: els.nicknameEl.value.trim() },
-                    emailRedirectTo: window.location.origin
-                }
-            });
-    
-            if (error) {
-                els.errorEl.textContent = error.message;
-            } else {
-                els.successEl.textContent = "Sign up successful! Check your email for confirmation.";
-                els.passwordEl.value = "";
-                
-                if (data.user) {
-                    // Store profile
-                    try {
-                        await supabase.from('profiles').upsert({
-                            id: data.user.id,
-                            nickname: els.nicknameEl.value.trim(),
-                            created_at: new Date().toISOString()
-                        });
-                    } catch (profileErr) {
-                        console.error("Profile error:", profileErr);
-                    }
-                }
-            }
-        } catch (err) {
-            els.errorEl.textContent = "An error occurred. Please try again.";
-            console.error(err);
-        }
-    };
-    
-    storyCommentsApp.handleLogin = async function() {
-        els.errorEl.textContent = "";
-        els.successEl.textContent = "";
-    
-        if (!els.emailEl.value || !els.passwordEl.value) {
-            els.errorEl.textContent = "Please enter email and password";
+        
+        console.log("👤 Current user check:", {
+            email: user.email,
+            confirmed: user.email_confirmed_at,
+            confirmedAt: user.email_confirmed_at,
+            id: user.id
+        });
+        
+        // 2. Check email confirmation
+        if (!user.email_confirmed_at) {
+            const msg = `Please confirm your email first. Check ${user.email} for the confirmation link.`;
+            showCommentError(msg);
+            updateDebugInfo("pending", `Email not confirmed for ${user.email}`);
             return;
         }
-    
-        try {
-            const { error } = await supabase.auth.signInWithPassword({
-                email: els.emailEl.value.trim(),
-                password: els.passwordEl.value
-            });
-    
-            if (error) {
-                els.errorEl.textContent = error.message;
-            } else {
-                els.successEl.textContent = "Login successful!";
-                els.passwordEl.value = "";
-            }
-        } catch (err) {
-            els.errorEl.textContent = "An error occurred. Please try again.";
-            console.error(err);
-        }
-    };
-    
-    storyCommentsApp.handleCommentSubmit = async function() {
-        const content = els.commentInput.value.trim();
-        if (!content) return alert("Please write a comment!");
-    
-        try {
-            const { data: { user }, error: userError } = await supabase.auth.getUser();
-            
-            if (userError) return alert("Error: " + userError.message);
-            if (!user) return alert("You must log in to comment!");
-            if (!user.email_confirmed_at) return alert("Confirm your email to post comments");
-    
-            const { error } = await supabase.from("story_comments").insert({
-                story_id: els.storyId,
+        
+        // 3. Post the comment
+        updateDebugInfo("processing", `Posting to story: ${storyId}`);
+        
+        const { error: insertError } = await supabase
+            .from("story_comments")
+            .insert({
+                story_id: storyId,
                 user_id: user.id,
                 content: content,
                 created_at: new Date().toISOString()
             });
-    
-            if (error) {
-                alert("Error: " + error.message);
-            } else {
-                els.commentInput.value = "";
-                storyCommentsApp.loadComments();
-            }
-        } catch (err) {
-            alert("An error occurred: " + err.message);
-            console.error(err);
-        }
-    };
-    
-    storyCommentsApp.loadComments = async function() {
-        try {
-            const { data, error } = await supabase
-                .from("story_comments")
-                .select(`
-                    content, 
-                    created_at, 
-                    profiles (nickname)
-                `)
-                .eq("story_id", els.storyId)
-                .order("created_at", { ascending: false });
-    
-            if (error) throw error;
-    
-            if (!data || data.length === 0) {
-                els.commentList.innerHTML = "<p>No comments yet. Be the first!</p>";
-                return;
-            }
-    
-            els.commentList.innerHTML = data.map(c => {
-                const nickname = c.profiles?.nickname || "Anonymous";
-                return `
-                    <div class="comment">
-                        <div class="author">${nickname}</div>
-                        <div>${c.content}</div>
-                        <div class="timestamp">${new Date(c.created_at).toLocaleString()}</div>
-                    </div>
-                `;
-            }).join("");
-        } catch (err) {
-            console.error("Error loading comments:", err);
-            els.commentList.innerHTML = `<p class="error">Error loading comments</p>`;
-        }
-    };
-    
-    // =================== AUTH STATE ===================
-    if (!window.authListenerSet) {
-        supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log("Auth event:", event);
+        
+        if (insertError) {
+            showCommentError("Failed to post: " + insertError.message);
+            updateDebugInfo("error", `Post failed: ${insertError.message}`);
+            console.error("❌ Insert error:", insertError);
+        } else {
+            // Success!
+            commentInput.value = "";
+            loadComments();
             
-            if (event === "SIGNED_IN" && session?.user) {
-                if (session.user.email_confirmed_at) {
-                    els.authForm.style.display = "none";
-                    els.commentForm.style.display = "block";
-                    els.successEl.textContent = `Welcome, ${session.user.user_metadata?.nickname || 'User'}!`;
-                } else {
-                    els.successEl.textContent = "Please confirm your email.";
-                }
-            } else if (event === "SIGNED_OUT") {
-                els.authForm.style.display = "block";
-                els.commentForm.style.display = "none";
-                els.successEl.textContent = "";
-            }
-            
-            storyCommentsApp.loadComments();
+            updateDebugInfo("success", "Comment posted!");
+            commentErrorEl.style.display = 'block';
+            commentErrorEl.className = 'success';
+            commentErrorEl.innerHTML = "✅ Comment posted successfully!";
+            setTimeout(() => {
+                commentErrorEl.style.display = 'none';
+            }, 3000);
+        }
+    } catch (err) {
+        showCommentError("Error: " + err.message);
+        updateDebugInfo("error", `Exception: ${err.message}`);
+        console.error("❌ Post error:", err);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Post Comment";
+    }
+}
+
+function showCommentError(message) {
+    commentErrorEl.innerHTML = message;
+    commentErrorEl.style.display = 'block';
+    commentErrorEl.className = 'error';
+}
+
+// =================== LOAD COMMENTS ===================
+async function loadComments() {
+    try {
+        updateDebugInfo("loading", "Fetching comments...");
+        
+        const { data, error } = await supabase
+            .from("story_comments")
+            .select(`
+                content, 
+                created_at,
+                profiles (nickname)
+            `)
+            .eq("story_id", storyId)
+            .order("created_at", { ascending: false });
+        
+        if (error) throw error;
+        
+        if (!data || data.length === 0) {
+            commentList.innerHTML = "<p>No comments yet. Be the first!</p>";
+            updateDebugInfo("loaded", "No comments found");
+        } else {
+            commentList.innerHTML = data.map(comment => `
+                <div class="comment">
+                    <div class="author">${comment.profiles?.nickname || 'Anonymous'}</div>
+                    <div>${comment.content}</div>
+                    <div class="timestamp">${new Date(comment.created_at).toLocaleString()}</div>
+                </div>
+            `).join('');
+            updateDebugInfo("loaded", `${data.length} comments loaded`);
+        }
+    } catch (err) {
+        console.error("❌ Load comments error:", err);
+        commentList.innerHTML = `<p class="error">Error loading comments</p>`;
+        updateDebugInfo("error", `Failed to load: ${err.message}`);
+    }
+}
+
+// =================== AUTH STATE ===================
+supabase.auth.onAuthStateChange(async (event, session) => {
+    console.log("🔐 Auth event:", event, session?.user?.email);
+    
+    if (event === "SIGNED_IN" && session?.user) {
+        console.log("📋 User details:", {
+            email: session.user.email,
+            confirmed: session.user.email_confirmed_at,
+            confirmedAt: session.user.email_confirmed_at,
+            metadata: session.user.user_metadata
         });
-        window.authListenerSet = true;
+        
+        // Show logout button
+        logoutBtn.style.display = 'inline-block';
+        
+        // Show appropriate message
+        if (session.user.email_confirmed_at) {
+            authForm.style.display = "none";
+            commentForm.style.display = "block";
+            commentInstruction.textContent = `Posting as: ${session.user.user_metadata?.nickname || session.user.email}`;
+            updateDebugInfo("confirmed", `Ready to comment as ${session.user.email}`);
+        } else {
+            authForm.style.display = "block";
+            commentForm.style.display = "none";
+            updateDebugInfo("pending", `Email not confirmed: ${session.user.email}`);
+            successEl.innerHTML = `
+                ⚠️ <strong>Email not confirmed</strong><br>
+                Check <strong>${session.user.email}</strong> for the confirmation link.<br>
+                <small>Check spam folder if you don't see it.</small>
+            `;
+        }
+    } else if (event === "SIGNED_OUT") {
+        authForm.style.display = "block";
+        commentForm.style.display = "none";
+        logoutBtn.style.display = 'none';
+        successEl.textContent = "";
+        updateDebugInfo("not-logged-in", "Please sign in to comment");
+    } else if (event === "USER_UPDATED") {
+        // When user confirms email
+        if (session?.user?.email_confirmed_at) {
+            authForm.style.display = "none";
+            commentForm.style.display = "block";
+            commentInstruction.textContent = `Posting as: ${session.user.user_metadata?.nickname || session.user.email}`;
+            updateDebugInfo("confirmed", `✅ Email confirmed! Ready to comment.`);
+            successEl.textContent = "✅ Email confirmed! You can now post comments.";
+        }
     }
     
-    // =================== INITIALIZE ===================
-    storyCommentsApp.init = function() {
-        // Attach event listeners (only once)
-        if (!els.signupBtnListener) {
-            document.getElementById("signup-btn").addEventListener("click", storyCommentsApp.handleSignup);
-            document.getElementById("login-btn").addEventListener("click", storyCommentsApp.handleLogin);
-            document.getElementById("submit-comment-btn").addEventListener("click", storyCommentsApp.handleCommentSubmit);
-            els.signupBtnListener = true;
+    loadComments();
+});
+
+// =================== INITIAL LOAD ===================
+async function initApp() {
+    try {
+        // Restore last email
+        const lastEmail = localStorage.getItem('lastEmail');
+        if (lastEmail && emailEl && !emailEl.value) {
+            emailEl.value = lastEmail;
         }
         
-        // Check current auth state
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session?.user?.email_confirmed_at) {
-                els.authForm.style.display = "none";
-                els.commentForm.style.display = "block";
+        // Check existing session
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log("🔍 Initial session check:", session?.user?.email);
+        
+        if (session?.user) {
+            updateDebugInfo("checking", `Found session for ${session.user.email}`);
+            
+            if (session.user.email_confirmed_at) {
+                authForm.style.display = "none";
+                commentForm.style.display = "block";
+                commentInstruction.textContent = `Posting as: ${session.user.user_metadata?.nickname || session.user.email}`;
+                logoutBtn.style.display = 'inline-block';
+                updateDebugInfo("confirmed", `Ready: ${session.user.email}`);
+            } else {
+                updateDebugInfo("pending", `Email not confirmed: ${session.user.email}`);
+                successEl.innerHTML = `Please confirm ${session.user.email}`;
             }
-        });
+        } else {
+            updateDebugInfo("not-logged-in", "Please sign in or create account");
+        }
         
         // Load comments
-        storyCommentsApp.loadComments();
+        await loadComments();
         
-        console.log("Story comments app initialized for:", els.storyId);
-    };
-    
-    // Start the app when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', storyCommentsApp.init);
-    } else {
-        storyCommentsApp.init();
+    } catch (err) {
+        console.error("❌ Init error:", err);
+        updateDebugInfo("error", `Init failed: ${err.message}`);
     }
-    
-    // Make app accessible globally (optional)
-    window.storyCommentsApp = storyCommentsApp;
-    
-})();
+}
+
+// Start the app
+initApp();
 </script>
 
 </body>
