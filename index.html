@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Story Comments Debug</title>
+<title>Story Comments</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -48,13 +48,16 @@ button:hover { background:#45a049; }
 </div>
 
 <script>
+// Initialize Supabase
 const supabase = window.supabase.createClient(
   "https://pidzgdrdgqgsayfoxqba.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZHpnZHJkZ3Fnc2F5Zm94cWJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NDI1OTcsImV4cCI6MjA4MTIxODU5N30.6sNn3jbNVfl-MEowIEjUknEKHlOcfKvVRa5pFqCHiw0"
 );
 
+// Get story ID from URL param
 const storyId = new URLSearchParams(window.location.search).get("story") || "default";
 
+// Elements
 const email = document.getElementById("email");
 const password = document.getElementById("password");
 const nickname = document.getElementById("nickname");
@@ -65,7 +68,7 @@ const commentForm = document.getElementById("comment-form");
 const commentInput = document.getElementById("comment");
 const commentList = document.getElementById("comment-list");
 
-/* SIGN UP */
+// ------------------- SIGN UP -------------------
 document.getElementById("signup-btn").onclick = async () => {
   errorEl.textContent = "";
   successEl.textContent = "";
@@ -85,7 +88,7 @@ document.getElementById("signup-btn").onclick = async () => {
   else successEl.textContent = "Check your email and click the confirmation link to activate your account.";
 };
 
-/* LOG IN */
+// ------------------- LOG IN -------------------
 document.getElementById("login-btn").onclick = async () => {
   errorEl.textContent = "";
   successEl.textContent = "";
@@ -98,20 +101,18 @@ document.getElementById("login-btn").onclick = async () => {
   if (error) errorEl.textContent = error.message;
 };
 
-/* POST COMMENT */
+// ------------------- POST COMMENT -------------------
 document.getElementById("submit-comment-btn").onclick = async () => {
   const comment = commentInput.value.trim();
   if (!comment) return alert("Please write a comment!");
 
-  // DEBUG: show current user
   const { data: { user }, error: sessionError } = await supabase.auth.getUser();
   console.log("Current user:", user, "Session error:", sessionError);
-  if (sessionError) return alert("Error fetching user: " + sessionError.message);
 
+  if (sessionError) return alert("Error fetching user: " + sessionError.message);
   if (!user) return alert("You must be logged in to comment!");
   if (!user.email_confirmed_at) return alert("You must confirm your email before posting comments!");
 
-  // Insert comment
   const { error } = await supabase.from("story_comments").insert({
     content: comment,
     story_id: storyId,
@@ -127,7 +128,7 @@ document.getElementById("submit-comment-btn").onclick = async () => {
   }
 };
 
-/* LOAD COMMENTS */
+// ------------------- LOAD COMMENTS -------------------
 async function loadComments() {
   const { data, error } = await supabase
     .from("story_comments")
@@ -152,7 +153,7 @@ async function loadComments() {
   if (!data || data.length === 0) commentList.innerHTML = "<p>No comments yet. Be the first!</p>";
 }
 
-/* AUTH STATE CHANGE */
+// ------------------- AUTH STATE CHANGE -------------------
 supabase.auth.onAuthStateChange(async (event, session) => {
   console.log("Auth event:", event, "Session:", session);
   if (event === "SIGNED_IN" && session?.user?.user_metadata?.nickname) {
@@ -171,7 +172,7 @@ supabase.auth.onAuthStateChange(async (event, session) => {
   loadComments();
 });
 
-/* INITIAL LOAD */
+// ------------------- INITIAL LOAD -------------------
 loadComments();
 </script>
 </body>
