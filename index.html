@@ -20,13 +20,24 @@
 
         input, textarea, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 5px; border: 1px solid #ddd; outline: none; }
         
-        /* Default Blue for Post Comment */
-        button { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; }
-        button:hover { background: #0056b3; }
+        /* Blue color for Post and Log In */
+        button, #btn-login-main { 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: background 0.2s; 
+        }
+        button:hover, #btn-login-main:hover { background: #0056b3; }
 
-        /* Green for Sign Up and Log In */
-        #btn-signup, #btn-login-main { background: #28a745; border: none; color: white; }
-        #btn-signup:hover, #btn-login-main:hover { background: #218838; }
+        /* Green color specifically for Create Account */
+        #btn-signup { 
+            background: #28a745; 
+        }
+        #btn-signup:hover { 
+            background: #218838; 
+        }
 
         .comment { border-bottom: 1px solid #eee; padding: 10px 0; font-size: 14px; position: relative; }
         .author { font-weight: bold; color: #007bff; margin-bottom: 2px; }
