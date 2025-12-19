@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Supabase Auth + Comments</title>
+<title>Story Comments</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -10,22 +11,20 @@
 body {
   font-family: Arial, sans-serif;
   background: #f4f4f9;
-  display: flex;
-  justify-content: center;
-  padding: 30px;
+  padding: 20px;
 }
 .container {
   max-width: 600px;
-  width: 100%;
-  background: white;
-  padding: 25px;
+  margin: auto;
+  background: #fff;
+  padding: 20px;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 input, textarea, button {
   width: 100%;
   padding: 12px;
   margin-top: 8px;
+  font-size: 15px;
 }
 button {
   background: #4CAF50;
@@ -36,8 +35,12 @@ button {
 button:hover { background: #45a049; }
 .error { color: red; }
 .success { color: green; }
-.comment { border-bottom: 1px solid #ddd; padding: 10px 0; }
+.comment {
+  border-bottom: 1px solid #ddd;
+  padding: 10px 0;
+}
 .author { font-weight: bold; }
+.timestamp { font-size: 12px; color: #666; }
 #comment-form { display: none; }
 </style>
 </head>
@@ -45,11 +48,13 @@ button:hover { background: #45a049; }
 <body>
 <div class="container">
 
-<h2>Sign Up / Log In</h2>
+<h2>Comments</h2>
 
+<!-- AUTH -->
 <div id="auth-form">
   <input id="email" type="email" placeholder="Email">
-  <input id="password" type="password" placeholder="Password">
+  <input id="password" type="password" placeholder="Password (min 6 chars)">
+  <input id="nickname" placeholder="Choose a nickname">
 
   <button id="signup-btn" type="button">Sign Up</button>
   <button id="login-btn" type="button">Log In</button>
@@ -58,26 +63,31 @@ button:hover { background: #45a049; }
   <p id="auth-success" class="success"></p>
 </div>
 
+<!-- COMMENT FORM -->
 <div id="comment-form">
-  <h3>Leave a comment</h3>
-  <textarea id="comment" rows="4"></textarea>
-  <button id="submit-comment-btn" type="button">Submit Comment</button>
+  <textarea id="comment" rows="4" placeholder="Write your comment..."></textarea>
+  <button id="submit-comment-btn" type="button">Post Comment</button>
 </div>
 
-<h3>Comments</h3>
 <div id="comment-list"></div>
 
 </div>
 
 <script>
-/* ✅ CORRECT SUPABASE INIT */
+/* ---------- SUPABASE ---------- */
 const supabase = window.supabase.createClient(
   "https://pidzgdrdgqgsayfoxqba.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZHpnZHJkZ3Fnc2F5Zm94cWJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NDI1OTcsImV4cCI6MjA4MTIxODU5N30.6sNn3jbNVfl-MEowIEjUknEKHlOcfKvVRa5pFqCHiw0"
 );
 
+/* ---------- STORY ID ---------- */
+const storyId =
+  new URLSearchParams(window.location.search).get("story") || "default";
+
+/* ---------- ELEMENTS ---------- */
 const email = document.getElementById("email");
 const password = document.getElementById("password");
+const nickname = document.getElementById("nickname");
 const errorEl = document.getElementById("auth-error");
 const successEl = document.getElementById("auth-success");
 const authForm = document.getElementById("auth-form");
@@ -85,17 +95,34 @@ const commentForm = document.getElementById("comment-form");
 const commentInput = document.getElementById("comment");
 const commentList = document.getElementById("comment-list");
 
+/* ---------- SIGN UP ---------- */
 document.getElementById("signup-btn").onclick = async () => {
   errorEl.textContent = "";
+  successEl.textContent = "";
+
+  if (!nickname.value.trim()) {
+    errorEl.textContent = "Please choose a nickname.";
+    return;
+  }
+
   const { error } = await supabase.auth.signUp({
     email: email.value,
     password: password.value,
-    options: { emailRedirectTo: window.location.href }
+    options: {
+      emailRedirectTo: window.location.href,
+      data: { nickname: nickname.value.trim() }
+    }
   });
-  if (error) errorEl.textContent = error.message;
-  else successEl.textContent = "Check your email to confirm your account.";
+
+  if (error) {
+    errorEl.textContent = error.message;
+  } else {
+    successEl.textContent =
+      "Check your email and click the confirmation link to activate your account.";
+  }
 };
 
+/* ---------- LOG IN ---------- */
 document.getElementById("login-btn").onclick = async () => {
   errorEl.textContent = "";
   const { error } = await supabase.auth.signInWithPassword({
@@ -105,48 +132,70 @@ document.getElementById("login-btn").onclick = async () => {
   if (error) errorEl.textContent = error.message;
 };
 
+/* ---------- POST COMMENT ---------- */
 document.getElementById("submit-comment-btn").onclick = async () => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return alert("Login required");
+  if (!commentInput.value.trim()) return;
 
-  await supabase.from("story_comments").insert({
+  const { error } = await supabase.from("story_comments").insert({
     content: commentInput.value,
-    user_id: user.id,
-    story_id: "test"
+    story_id: storyId
   });
 
-  commentInput.value = "";
-  loadComments();
+  if (!error) {
+    commentInput.value = "";
+    loadComments();
+  }
 };
 
+/* ---------- LOAD COMMENTS (PUBLIC) ---------- */
 async function loadComments() {
   const { data } = await supabase
     .from("story_comments")
-    .select("content, created_at")
+    .select(`
+      content,
+      created_at,
+      profiles ( nickname )
+    `)
+    .eq("story_id", storyId)
     .order("created_at", { ascending: false });
 
   commentList.innerHTML = (data || []).map(c => `
     <div class="comment">
-      <div class="author">Anonymous</div>
+      <div class="author">${c.profiles?.nickname || "Anonymous"}</div>
       <div>${c.content}</div>
-      <div style="font-size:12px;color:#666">
+      <div class="timestamp">
         ${new Date(c.created_at).toLocaleString()}
       </div>
     </div>
   `).join("");
 }
 
-supabase.auth.onAuthStateChange((_, session) => {
-  if (session) {
+/* ---------- AUTH STATE ---------- */
+supabase.auth.onAuthStateChange(async (event, session) => {
+
+  if (event === "SIGNED_IN" && session?.user) {
+    const nick = session.user.user_metadata?.nickname;
+
+    if (nick) {
+      await supabase.from("profiles").insert({
+        id: session.user.id,
+        nickname: nick
+      }).select().single();
+    }
+  }
+
+  if (session && session.user.email_confirmed_at) {
     authForm.style.display = "none";
     commentForm.style.display = "block";
   } else {
     authForm.style.display = "block";
     commentForm.style.display = "none";
   }
+
   loadComments();
 });
 
+/* ---------- INITIAL ---------- */
 loadComments();
 </script>
 </body>
