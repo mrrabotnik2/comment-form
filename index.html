@@ -2,10 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Story Comments</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <style>
 body { font-family: Arial; background:#f4f4f9; padding:20px; }
 .container { max-width:600px; margin:auto; background:#fff; padding:20px; border-radius:8px; }
@@ -17,7 +16,7 @@ button:hover { background:#45a049; }
 .comment { border-bottom:1px solid #ddd; padding:10px 0; }
 .author { font-weight:bold; }
 .timestamp { font-size:12px; color:#666; }
-#comment-form { display:none; }
+#comment-form { display:none; margin-top:15px; }
 </style>
 </head>
 <body>
@@ -31,8 +30,8 @@ button:hover { background:#45a049; }
   <input id="password" type="password" placeholder="Password (min 6 chars)">
   <input id="nickname" placeholder="Choose a nickname">
 
-  <button id="signup-btn" type="button">Sign Up</button>
-  <button id="login-btn" type="button">Log In</button>
+  <button id="signup-btn">Sign Up</button>
+  <button id="login-btn">Log In</button>
 
   <p id="auth-error" class="error"></p>
   <p id="auth-success" class="success"></p>
@@ -41,7 +40,7 @@ button:hover { background:#45a049; }
 <!-- COMMENT FORM -->
 <div id="comment-form">
   <textarea id="comment" rows="4" placeholder="Write your comment..."></textarea>
-  <button id="submit-comment-btn" type="button">Post Comment</button>
+  <button id="submit-comment-btn">Post Comment</button>
 </div>
 
 <div id="comment-list"></div>
@@ -49,12 +48,12 @@ button:hover { background:#45a049; }
 
 <script>
 // Initialize Supabase
-const supabase = window.supabase.createClient(
+const supabase = supabase.createClient(
   "https://pidzgdrdgqgsayfoxqba.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZHpnZHJkZ3Fnc2F5Zm94cWJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NDI1OTcsImV4cCI6MjA4MTIxODU5N30.6sNn3jbNVfl-MEowIEjUknEKHlOcfKvVRa5pFqCHiw0"
 );
 
-// Get story ID from URL param
+// Get story ID from URL
 const storyId = new URLSearchParams(window.location.search).get("story") || "default";
 
 // Elements
@@ -131,7 +130,7 @@ async function loadComments() {
   try {
     const { data, error } = await supabase
       .from("story_comments")
-      .select(`content, created_at, profiles!inner(nickname)`) // join profiles
+      .select(`content, created_at, profiles!inner(*)`) // use inner join with profiles table
       .eq("story_id", storyId)
       .order("created_at", { ascending: false });
 
@@ -146,11 +145,11 @@ async function loadComments() {
       return;
     }
 
-    commentList.innerHTML = data.map(comment => `
+    commentList.innerHTML = data.map(c => `
       <div class="comment">
-        <div class="author">${comment.profiles?.nickname || "Anonymous"}</div>
-        <div>${comment.content}</div>
-        <div class="timestamp">${new Date(comment.created_at).toLocaleString()}</div>
+        <div class="author">${c.profiles?.nickname || "Anonymous"}</div>
+        <div>${c.content}</div>
+        <div class="timestamp">${new Date(c.created_at).toLocaleString()}</div>
       </div>
     `).join("");
 
@@ -162,6 +161,7 @@ async function loadComments() {
 // ------------------- AUTH STATE CHANGE -------------------
 supabase.auth.onAuthStateChange(async (event, session) => {
   console.log("Auth event:", event, "Session:", session);
+
   if (event === "SIGNED_IN" && session?.user?.user_metadata?.nickname) {
     const nick = session.user.user_metadata.nickname;
     await supabase.from("profiles").upsert({ id: session.user.id, nickname: nick });
