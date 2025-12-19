@@ -132,7 +132,7 @@ document.getElementById("submit-comment-btn").onclick = async () => {
 async function loadComments() {
   const { data, error } = await supabase
     .from("story_comments")
-    .select(`content, created_at, profiles(nickname)`)
+    .select(`content, created_at, profiles!inner(nickname)`)
     .eq("story_id", storyId)
     .order("created_at", { ascending: false });
 
