@@ -6,12 +6,13 @@
     <title>Story Comments</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* General Layout */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: sans-serif; background: #f9f9fb; padding: 10px; }
         
         .container { 
             max-width: 500px; 
-            margin: 20px auto; 
+            margin: 20px auto; /* Centered form */
             background: #fff; 
             padding: 15px; 
             border-radius: 8px; 
@@ -20,7 +21,7 @@
 
         input, textarea, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 5px; border: 1px solid #ddd; outline: none; }
         
-        /* Blue color for Post and Log In */
+        /* Blue Buttons (Login & Post) */
         button, #btn-login-main { 
             background: #007bff; 
             color: white; 
@@ -31,7 +32,7 @@
         }
         button:hover, #btn-login-main:hover { background: #0056b3; }
 
-        /* Green color specifically for Create Account */
+        /* Green Button (Create Account) */
         #btn-signup { 
             background: #28a745; 
         }
@@ -39,11 +40,13 @@
             background: #218838; 
         }
 
+        /* Comment Section Styles */
         .comment { border-bottom: 1px solid #eee; padding: 10px 0; font-size: 14px; position: relative; }
         .author { font-weight: bold; color: #007bff; margin-bottom: 2px; }
         .hidden { display: none; }
         #status-bar { font-size: 12px; margin-bottom: 10px; color: #666; text-align: center; }
         
+        /* Delete Link Style */
         .btn-delete {
             background: none;
             color: #ff4d4d;
@@ -155,10 +158,11 @@
             else { document.getElementById('msg').value = ''; loadComments(); }
         };
 
+        // Attached to window so it's globally accessible for the onclick event
         window.deleteComment = async (id) => {
             if(!confirm("Delete this comment?")) return;
             const { error } = await supabase.from('story_comments').delete().eq('id', id);
-            if(error) alert(error.message);
+            if(error) alert("Error: " + error.message);
             else loadComments();
         };
 
@@ -171,7 +175,7 @@
             else {
                 box.innerHTML = data.map(c => {
                     const isOwner = user && user.id === c.user_id;
-                    const deleteBtn = isOwner ? `<button class="btn-delete" onclick="deleteComment('${c.id}')">Delete</button>` : '';
+                    const deleteBtn = isOwner ? `<button class="btn-delete" onclick="window.deleteComment('${c.id}')">Delete</button>` : '';
                     return `
                         <div class="comment">
                             <div class="author">${c.nickname || 'Guest'}</div>
