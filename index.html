@@ -127,47 +127,34 @@ document.getElementById("submit-comment-btn").onclick = async () => {
 
 // ------------------- LOAD COMMENTS -------------------
 async function loadComments() {
-  try {
-    const { data, error } = await supabase
-      .from("story_comments")
-      .select(`content, created_at, profiles!inner(*)`) // dynamic alias
-      .eq("story_id", storyId)
-      .order("created_at", { ascending: false });
+  const { data, error } = await supabase
+    .from("story_comments")
+    .select('content, created_at, profiles(nickname)')
+    .eq("story_id", storyId)
+    .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("Load comments error:", error);
-      commentList.innerHTML = `<p style="color:red;">Error loading comments: ${error.message}</p>`;
-      return;
-    }
-
-    if (!data || data.length === 0) {
-      commentList.innerHTML = "<p>No comments yet. Be the first!</p>";
-      return;
-    }
-
-    commentList.innerHTML = data.map(c => {
-      // Find the first property that starts with "profiles"
-      const profileKey = Object.keys(c).find(k => k.startsWith("profiles"));
-      const nickname = profileKey ? c[profileKey]?.nickname : "Anonymous";
-
-      return `
-        <div class="comment">
-          <div class="author">${nickname}</div>
-          <div>${c.content}</div>
-          <div class="timestamp">${new Date(c.created_at).toLocaleString()}</div>
-        </div>
-      `;
-    }).join("");
-
-  } catch (err) {
-    console.error("Unexpected error loading comments:", err);
+  if (error) {
+    console.error("Load comments error:", error);
+    commentList.innerHTML = `<p style="color:red;">Error loading comments: ${error.message}</p>`;
+    return;
   }
+
+  if (!data || data.length === 0) {
+    commentList.innerHTML = "<p>No comments yet. Be the first!</p>";
+    return;
+  }
+
+  commentList.innerHTML = data.map(c => `
+    <div class="comment">
+      <div class="author">${c.profiles?.nickname || "Anonymous"}</div>
+      <div>${c.content}</div>
+      <div class="timestamp">${new Date(c.created_at).toLocaleString()}</div>
+    </div>
+  `).join("");
 }
 
 // ------------------- AUTH STATE CHANGE -------------------
 supabase.auth.onAuthStateChange(async (event, session) => {
-  console.log("Auth event:", event, "Session:", session);
-
   if (event === "SIGNED_IN" && session?.user?.user_metadata?.nickname) {
     const nick = session.user.user_metadata.nickname;
     await supabase.from("profiles").upsert({ id: session.user.id, nickname: nick });
