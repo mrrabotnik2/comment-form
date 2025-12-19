@@ -6,88 +6,21 @@
   <title>Sign Up / Login - Supabase</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      background-color: #f4f4f9;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      color: #333;
-    }
-
-    .container {
-      width: 80%;
-      max-width: 600px;
-      background-color: #fff;
-      padding: 20px;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-      border-radius: 8px;
-    }
-
-    h2, h3 {
-      text-align: center;
-    }
-
-    .form-group {
-      margin-bottom: 15px;
-    }
-
-    .form-group label {
-      display: block;
-      margin-bottom: 5px;
-    }
-
-    .form-group input,
-    .form-group textarea,
-    .form-group button {
-      width: 100%;
-      padding: 10px;
-      margin: 5px 0;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      box-sizing: border-box;
-    }
-
-    .form-group button {
-      background-color: #4CAF50;
-      color: white;
-      cursor: pointer;
-    }
-
-    .form-group button:hover {
-      background-color: #45a049;
-    }
-
-    .error {
-      color: red;
-      text-align: center;
-    }
-
-    .success {
-      color: green;
-      text-align: center;
-    }
-
-    #comment-form {
-      display: none;
-    }
-
-    .comment {
-      border-bottom: 1px solid #eee;
-      padding: 10px 0;
-    }
-
-    .author {
-      font-weight: bold;
-    }
-
-    .timestamp {
-      font-size: 0.8em;
-      color: #666;
-    }
+    /* (Same styles as before - unchanged) */
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; display: flex; justify-content: center; align-items: center; height: 100vh; color: #333; }
+    .container { width: 80%; max-width: 600px; background-color: #fff; padding: 20px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); border-radius: 8px; }
+    h2, h3 { text-align: center; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; }
+    .form-group input, .form-group textarea, .form-group button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+    .form-group button { background-color: #4CAF50; color: white; cursor: pointer; }
+    .form-group button:hover { background-color: #45a049; }
+    .error { color: red; text-align: center; }
+    .success { color: green; text-align: center; }
+    #comment-form { display: none; }
+    .comment { border-bottom: 1px solid #eee; padding: 10px 0; }
+    .author { font-weight: bold; }
+    .timestamp { font-size: 0.8em; color: #666; }
   </style>
 </head>
 <body>
@@ -95,7 +28,6 @@
 <div class="container">
   <h2>Sign Up / Log In</h2>
 
-  <!-- Authentication Form -->
   <div id="auth-form">
     <div class="form-group">
       <label for="email">Email</label>
@@ -116,7 +48,6 @@
     <p class="success" id="auth-success"></p>
   </div>
 
-  <!-- Comment Form (shows only after login) -->
   <div id="comment-form">
     <h3>Leave a Comment</h3>
     <div class="form-group">
@@ -126,18 +57,18 @@
     <button id="submit-comment-btn">Submit Comment</button>
   </div>
 
-  <!-- Comments List (always visible to everyone) -->
   <h3>Comments</h3>
   <div class="comment-list" id="comment-list"></div>
 </div>
 
 <script>
-  // Initialize Supabase client with your provided key
+  // Correct anon key for your project
   const supabase = Supabase.createClient(
     "https://pidzgdrdgqgsayfoxqba.supabase.co",
-    "sb_publishable_-rGnPqFMdXSVXmKdI2bCow_R7uuC53z"
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZHpnZHJkZ3Fnc2F5Zm94cWJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NDI1OTcsImV4cCI6MjA4MTIxODU5N30.6sNn3jbNVfl-MEowIEjUknEKHlOcfKvVRa5pFqCHiw0"
   );
 
+  // (Rest of the script is unchanged from the previous version I provided)
   const emailInput = document.getElementById('email');
   const passwordInput = document.getElementById('password');
   const signupBtn = document.getElementById('signup-btn');
@@ -150,10 +81,8 @@
   const commentList = document.getElementById('comment-list');
   const authForm = document.getElementById('auth-form');
 
-  // Use current page URL for redirect after email confirmation
   const redirectUrl = window.location.href;
 
-  // Sign Up
   signupBtn.addEventListener('click', async () => {
     authError.textContent = '';
     authSuccess.textContent = '';
@@ -168,9 +97,7 @@
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        emailRedirectTo: redirectUrl
-      }
+      options: { emailRedirectTo: redirectUrl }
     });
 
     if (error) {
@@ -182,7 +109,6 @@
     }
   });
 
-  // Log In
   loginBtn.addEventListener('click', async () => {
     authError.textContent = '';
     authSuccess.textContent = '';
@@ -194,20 +120,15 @@
       return;
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       authError.textContent = error.message;
     } else {
       passwordInput.value = '';
-      // Success handled by onAuthStateChange
     }
   });
 
-  // Submit Comment
   submitCommentBtn.addEventListener('click', async () => {
     const commentContent = commentInput.value.trim();
     if (!commentContent) return alert("Please write a comment!");
@@ -227,7 +148,6 @@
     }
   });
 
-  // Load Comments (visible to everyone)
   async function loadComments() {
     const { data, error } = await supabase
       .from("story_comments")
@@ -255,7 +175,6 @@
     `).join('');
   }
 
-  // Auth State Listener
   supabase.auth.onAuthStateChange(async (event, session) => {
     if (session) {
       authForm.style.display = 'none';
@@ -269,7 +188,6 @@
     loadComments();
   });
 
-  // Initial load
   loadComments();
 </script>
 
