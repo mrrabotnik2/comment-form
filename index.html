@@ -6,7 +6,7 @@
 <title>Story Comments</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-body { font-family: Arial; background:#f4f4f9; padding:20px; }
+body { font-family: Arial, sans-serif; background:#f4f4f9; padding:20px; }
 .container { max-width:600px; margin:auto; background:#fff; padding:20px; border-radius:8px; }
 input, textarea, button { width:100%; padding:12px; margin-top:8px; font-size:15px; }
 button { background:#4CAF50; color:white; border:none; cursor:pointer; }
@@ -129,7 +129,7 @@ document.getElementById("submit-comment-btn").onclick = async () => {
 async function loadComments() {
   const { data, error } = await supabase
     .from("story_comments")
-    .select('content, created_at, profiles(nickname)')
+    .select('content, created_at, profiles!inner(*)')
     .eq("story_id", storyId)
     .order("created_at", { ascending: false });
 
@@ -144,13 +144,19 @@ async function loadComments() {
     return;
   }
 
-  commentList.innerHTML = data.map(c => `
-    <div class="comment">
-      <div class="author">${c.profiles?.nickname || "Anonymous"}</div>
-      <div>${c.content}</div>
-      <div class="timestamp">${new Date(c.created_at).toLocaleString()}</div>
-    </div>
-  `).join("");
+  commentList.innerHTML = data.map(c => {
+    // Detect the joined table key dynamically
+    const profileKey = Object.keys(c).find(k => k.startsWith("profiles"));
+    const nickname = profileKey ? c[profileKey]?.nickname : "Anonymous";
+
+    return `
+      <div class="comment">
+        <div class="author">${nickname}</div>
+        <div>${c.content}</div>
+        <div class="timestamp">${new Date(c.created_at).toLocaleString()}</div>
+      </div>
+    `;
+  }).join("");
 }
 
 // ------------------- AUTH STATE CHANGE -------------------
