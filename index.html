@@ -81,8 +81,7 @@ const supabase = window.supabase.createClient(
 );
 
 /* ---------- STORY ID ---------- */
-const storyId =
-  new URLSearchParams(window.location.search).get("story") || "default";
+const storyId = new URLSearchParams(window.location.search).get("story") || "default";
 
 /* ---------- ELEMENTS ---------- */
 const email = document.getElementById("email");
@@ -175,14 +174,13 @@ async function loadComments() {
 
 /* ---------- AUTH STATE ---------- */
 supabase.auth.onAuthStateChange(async (event, session) => {
-
-  // Save nickname after first confirmed login
+  // Save nickname to profiles table after first confirmed login
   if (event === "SIGNED_IN" && session?.user?.user_metadata?.nickname) {
     const nick = session.user.user_metadata.nickname;
     await supabase.from("profiles").upsert({ id: session.user.id, nickname: nick });
   }
 
-  // Show comment form only if confirmed
+  // Show comment form only if email confirmed
   if (session && session.user.email_confirmed_at) {
     authForm.style.display = "none";
     commentForm.style.display = "block";
