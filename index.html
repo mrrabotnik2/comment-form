@@ -45,296 +45,262 @@ button:hover { background:#45a049; }
 </div>
 
 <script>
-// =================== SINGLE INITIALIZATION PATTERN ===================
-// This pattern ensures Supabase is only initialized once
+// =================== IMMEDIATE EXECUTION PREVENTION ===================
+// If this script has already run, STOP immediately
+if (window.commentsAppLoaded) {
+    console.warn('Comments app already loaded, stopping duplicate execution');
+    // If we're here, the page is loading this script twice
+    // Let's clean up and exit
+    throw new Error('Script already executed');
+}
 
-// Check if Supabase is already initialized (prevent duplicate declaration)
-if (typeof window.__supabaseClient === 'undefined') {
+// Mark as loaded IMMEDIATELY
+window.commentsAppLoaded = true;
+
+// =================== SINGLE INITIALIZATION ===================
+// Use var instead of const/let to avoid duplicate declaration errors
+var supabase;
+var storyCommentsApp = {};
+
+// Only initialize if not already done
+if (!window.supabaseClient) {
     const SUPABASE_URL = "https://pidzgdrdgqgsayfoxqba.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZHpnZHJkZ3Fnc2F5Zm94cWJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NDI1OTcsImV4cCI6MjA4MTIxODU5N30.6sNn3jbNVfl-MEowIEjUknEKHlOcfKvVRa5pFqCHiw0";
 
     try {
-        window.__supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        console.log("Supabase client initialized successfully");
+        window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log("Supabase client initialized");
     } catch (error) {
-        console.error("CRITICAL: Failed to initialize Supabase client:", error);
-        document.body.innerHTML = '<div class="container"><h2>System Error</h2><p class="error">Failed to initialize application. Please refresh the page.</p></div>';
+        console.error("Failed to initialize Supabase:", error);
+        document.body.innerHTML = '<div class="container"><h2>System Error</h2><p class="error">Failed to load comments system. Please refresh.</p></div>';
         throw error;
     }
 }
 
-// Use the globally stored client
-const supabase = window.__supabaseClient;
+// Use the global instance
+supabase = window.supabaseClient;
 
-// =================== ELEMENT REFERENCES ===================
-const storyId = new URLSearchParams(window.location.search).get("story") || "default";
-const emailEl = document.getElementById("email");
-const passwordEl = document.getElementById("password");
-const nicknameEl = document.getElementById("nickname");
-const authForm = document.getElementById("auth-form");
-const commentForm = document.getElementById("comment-form");
-const commentInput = document.getElementById("comment");
-const commentList = document.getElementById("comment-list");
-const errorEl = document.getElementById("auth-error");
-const successEl = document.getElementById("auth-success");
-
-// =================== EVENT LISTENERS ===================
-// Check if event listeners are already attached
-if (!window.__commentsInitialized) {
-    document.getElementById("signup-btn").addEventListener("click", handleSignup);
-    document.getElementById("login-btn").addEventListener("click", handleLogin);
-    document.getElementById("submit-comment-btn").addEventListener("click", handleCommentSubmit);
-    window.__commentsInitialized = true;
-}
-
-// =================== SIGN UP HANDLER ===================
-async function handleSignup() {
-  errorEl.textContent = "";
-  successEl.textContent = "";
-
-  if (!emailEl.value || !passwordEl.value || !nicknameEl.value) {
-    errorEl.textContent = "Please fill all fields";
-    return;
-  }
-
-  if (passwordEl.value.length < 6) {
-    errorEl.textContent = "Password must be at least 6 characters";
-    return;
-  }
-
-  try {
-    const { data, error } = await supabase.auth.signUp({
-      email: emailEl.value.trim(),
-      password: passwordEl.value,
-      options: {
-        data: { 
-          nickname: nicknameEl.value.trim() 
-        },
-        emailRedirectTo: window.location.origin
-      }
-    });
-
-    if (error) {
-      errorEl.textContent = error.message;
-      console.error("Signup error:", error);
-    } else {
-      successEl.textContent = "Sign up successful! Please check your email for the confirmation link.";
-      // Store email for login convenience
-      if (data.user) {
-        localStorage.setItem('lastEmail', emailEl.value.trim());
-        // Create profile
-        try {
-          await supabase.from('profiles').upsert({
-            id: data.user.id,
-            nickname: nicknameEl.value.trim(),
-            created_at: new Date().toISOString()
-          });
-        } catch (profileErr) {
-          console.error("Profile creation error:", profileErr);
+// =================== MAIN APPLICATION ===================
+(function() {
+    'use strict';
+    
+    // Store element references in our app object
+    storyCommentsApp.elements = {
+        storyId: new URLSearchParams(window.location.search).get("story") || "default",
+        emailEl: document.getElementById("email"),
+        passwordEl: document.getElementById("password"),
+        nicknameEl: document.getElementById("nickname"),
+        authForm: document.getElementById("auth-form"),
+        commentForm: document.getElementById("comment-form"),
+        commentInput: document.getElementById("comment"),
+        commentList: document.getElementById("comment-list"),
+        errorEl: document.getElementById("auth-error"),
+        successEl: document.getElementById("auth-success")
+    };
+    
+    const els = storyCommentsApp.elements;
+    
+    // =================== EVENT HANDLERS ===================
+    storyCommentsApp.handleSignup = async function() {
+        els.errorEl.textContent = "";
+        els.successEl.textContent = "";
+    
+        if (!els.emailEl.value || !els.passwordEl.value || !els.nicknameEl.value) {
+            els.errorEl.textContent = "Please fill all fields";
+            return;
         }
-      }
-      // Clear sensitive fields only
-      passwordEl.value = "";
+    
+        if (els.passwordEl.value.length < 6) {
+            els.errorEl.textContent = "Password must be at least 6 characters";
+            return;
+        }
+    
+        try {
+            const { data, error } = await supabase.auth.signUp({
+                email: els.emailEl.value.trim(),
+                password: els.passwordEl.value,
+                options: {
+                    data: { nickname: els.nicknameEl.value.trim() },
+                    emailRedirectTo: window.location.origin
+                }
+            });
+    
+            if (error) {
+                els.errorEl.textContent = error.message;
+            } else {
+                els.successEl.textContent = "Sign up successful! Check your email for confirmation.";
+                els.passwordEl.value = "";
+                
+                if (data.user) {
+                    // Store profile
+                    try {
+                        await supabase.from('profiles').upsert({
+                            id: data.user.id,
+                            nickname: els.nicknameEl.value.trim(),
+                            created_at: new Date().toISOString()
+                        });
+                    } catch (profileErr) {
+                        console.error("Profile error:", profileErr);
+                    }
+                }
+            }
+        } catch (err) {
+            els.errorEl.textContent = "An error occurred. Please try again.";
+            console.error(err);
+        }
+    };
+    
+    storyCommentsApp.handleLogin = async function() {
+        els.errorEl.textContent = "";
+        els.successEl.textContent = "";
+    
+        if (!els.emailEl.value || !els.passwordEl.value) {
+            els.errorEl.textContent = "Please enter email and password";
+            return;
+        }
+    
+        try {
+            const { error } = await supabase.auth.signInWithPassword({
+                email: els.emailEl.value.trim(),
+                password: els.passwordEl.value
+            });
+    
+            if (error) {
+                els.errorEl.textContent = error.message;
+            } else {
+                els.successEl.textContent = "Login successful!";
+                els.passwordEl.value = "";
+            }
+        } catch (err) {
+            els.errorEl.textContent = "An error occurred. Please try again.";
+            console.error(err);
+        }
+    };
+    
+    storyCommentsApp.handleCommentSubmit = async function() {
+        const content = els.commentInput.value.trim();
+        if (!content) return alert("Please write a comment!");
+    
+        try {
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            
+            if (userError) return alert("Error: " + userError.message);
+            if (!user) return alert("You must log in to comment!");
+            if (!user.email_confirmed_at) return alert("Confirm your email to post comments");
+    
+            const { error } = await supabase.from("story_comments").insert({
+                story_id: els.storyId,
+                user_id: user.id,
+                content: content,
+                created_at: new Date().toISOString()
+            });
+    
+            if (error) {
+                alert("Error: " + error.message);
+            } else {
+                els.commentInput.value = "";
+                storyCommentsApp.loadComments();
+            }
+        } catch (err) {
+            alert("An error occurred: " + err.message);
+            console.error(err);
+        }
+    };
+    
+    storyCommentsApp.loadComments = async function() {
+        try {
+            const { data, error } = await supabase
+                .from("story_comments")
+                .select(`
+                    content, 
+                    created_at, 
+                    profiles (nickname)
+                `)
+                .eq("story_id", els.storyId)
+                .order("created_at", { ascending: false });
+    
+            if (error) throw error;
+    
+            if (!data || data.length === 0) {
+                els.commentList.innerHTML = "<p>No comments yet. Be the first!</p>";
+                return;
+            }
+    
+            els.commentList.innerHTML = data.map(c => {
+                const nickname = c.profiles?.nickname || "Anonymous";
+                return `
+                    <div class="comment">
+                        <div class="author">${nickname}</div>
+                        <div>${c.content}</div>
+                        <div class="timestamp">${new Date(c.created_at).toLocaleString()}</div>
+                    </div>
+                `;
+            }).join("");
+        } catch (err) {
+            console.error("Error loading comments:", err);
+            els.commentList.innerHTML = `<p class="error">Error loading comments</p>`;
+        }
+    };
+    
+    // =================== AUTH STATE ===================
+    if (!window.authListenerSet) {
+        supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log("Auth event:", event);
+            
+            if (event === "SIGNED_IN" && session?.user) {
+                if (session.user.email_confirmed_at) {
+                    els.authForm.style.display = "none";
+                    els.commentForm.style.display = "block";
+                    els.successEl.textContent = `Welcome, ${session.user.user_metadata?.nickname || 'User'}!`;
+                } else {
+                    els.successEl.textContent = "Please confirm your email.";
+                }
+            } else if (event === "SIGNED_OUT") {
+                els.authForm.style.display = "block";
+                els.commentForm.style.display = "none";
+                els.successEl.textContent = "";
+            }
+            
+            storyCommentsApp.loadComments();
+        });
+        window.authListenerSet = true;
     }
-  } catch (err) {
-    errorEl.textContent = "An unexpected error occurred. Please try again.";
-    console.error("Unexpected error:", err);
-  }
-}
-
-// =================== LOGIN HANDLER ===================
-async function handleLogin() {
-  errorEl.textContent = "";
-  successEl.textContent = "";
-
-  if (!emailEl.value || !passwordEl.value) {
-    errorEl.textContent = "Please enter email and password";
-    return;
-  }
-
-  try {
-    const { error } = await supabase.auth.signInWithPassword({
-      email: emailEl.value.trim(),
-      password: passwordEl.value
-    });
-
-    if (error) {
-      errorEl.textContent = error.message;
-      console.error("Login error:", error);
+    
+    // =================== INITIALIZE ===================
+    storyCommentsApp.init = function() {
+        // Attach event listeners (only once)
+        if (!els.signupBtnListener) {
+            document.getElementById("signup-btn").addEventListener("click", storyCommentsApp.handleSignup);
+            document.getElementById("login-btn").addEventListener("click", storyCommentsApp.handleLogin);
+            document.getElementById("submit-comment-btn").addEventListener("click", storyCommentsApp.handleCommentSubmit);
+            els.signupBtnListener = true;
+        }
+        
+        // Check current auth state
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user?.email_confirmed_at) {
+                els.authForm.style.display = "none";
+                els.commentForm.style.display = "block";
+            }
+        });
+        
+        // Load comments
+        storyCommentsApp.loadComments();
+        
+        console.log("Story comments app initialized for:", els.storyId);
+    };
+    
+    // Start the app when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', storyCommentsApp.init);
     } else {
-      successEl.textContent = "Login successful!";
-      localStorage.setItem('lastEmail', emailEl.value.trim());
-      passwordEl.value = ""; // Clear password for security
-    }
-  } catch (err) {
-    errorEl.textContent = "An unexpected error occurred. Please try again.";
-    console.error("Unexpected error:", err);
-  }
-}
-
-// =================== COMMENT SUBMISSION ===================
-async function handleCommentSubmit() {
-  const content = commentInput.value.trim();
-  if (!content) return alert("Please write a comment!");
-
-  try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError) {
-      alert("Error fetching user: " + userError.message);
-      return;
+        storyCommentsApp.init();
     }
     
-    if (!user) {
-      alert("You must log in to comment!");
-      return;
-    }
+    // Make app accessible globally (optional)
+    window.storyCommentsApp = storyCommentsApp;
     
-    if (!user.email_confirmed_at) {
-      alert("You must confirm your email to post comments");
-      return;
-    }
-
-    const { error } = await supabase.from("story_comments").insert({
-      story_id: storyId,
-      user_id: user.id,
-      content: content,
-      created_at: new Date().toISOString()
-    });
-
-    if (error) {
-      alert("Error posting comment: " + error.message);
-      console.error("Comment error:", error);
-    } else {
-      commentInput.value = "";
-      loadComments();
-    }
-  } catch (err) {
-    alert("An unexpected error occurred: " + err.message);
-    console.error("Unexpected error:", err);
-  }
-}
-
-// =================== LOAD COMMENTS ===================
-async function loadComments() {
-  try {
-    const { data, error } = await supabase
-      .from("story_comments")
-      .select(`
-        content, 
-        created_at, 
-        user_id,
-        profiles (
-          nickname
-        )
-      `)
-      .eq("story_id", storyId)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Error loading comments:", error);
-      commentList.innerHTML = `<p style="color:red;">Error loading comments: ${error.message}</p>`;
-      return;
-    }
-
-    if (!data || data.length === 0) {
-      commentList.innerHTML = "<p>No comments yet. Be the first!</p>";
-      return;
-    }
-
-    commentList.innerHTML = data.map(c => {
-      const nickname = c.profiles?.nickname || "Anonymous";
-      return `
-        <div class="comment">
-          <div class="author">${nickname}</div>
-          <div>${c.content}</div>
-          <div class="timestamp">${new Date(c.created_at).toLocaleString()}</div>
-        </div>
-      `;
-    }).join("");
-  } catch (err) {
-    console.error("Unexpected error loading comments:", err);
-    commentList.innerHTML = `<p style="color:red;">Error loading comments</p>`;
-  }
-}
-
-// =================== AUTH STATE MANAGEMENT ===================
-// Only set up auth state listener once
-if (!window.__authListenerSet) {
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    console.log("Auth state changed:", event);
-    
-    if (event === "SIGNED_IN" && session?.user) {
-      // Pre-fill email if stored
-      const lastEmail = localStorage.getItem('lastEmail');
-      if (lastEmail && emailEl) {
-        emailEl.value = lastEmail;
-      }
-      
-      // Update profile
-      const nickname = session.user.user_metadata?.nickname || 
-                      session.user.email?.split('@')[0] || 
-                      'User';
-      
-      try {
-        await supabase.from('profiles').upsert({
-          id: session.user.id,
-          nickname: nickname,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'id' });
-      } catch (err) {
-        console.error("Profile error:", err);
-      }
-
-      // Show/hide forms based on email confirmation
-      if (session.user.email_confirmed_at) {
-        if (authForm) authForm.style.display = "none";
-        if (commentForm) commentForm.style.display = "block";
-        if (successEl) successEl.textContent = `Welcome, ${nickname}!`;
-      } else {
-        if (successEl) successEl.textContent = "Please check your email and confirm your account.";
-      }
-    } else if (event === "SIGNED_OUT") {
-      if (authForm) authForm.style.display = "block";
-      if (commentForm) commentForm.style.display = "none";
-      if (successEl) successEl.textContent = "";
-    }
-
-    loadComments();
-  });
-  window.__authListenerSet = true;
-}
-
-// =================== INITIAL LOAD ===================
-async function init() {
-  try {
-    // Check for existing email
-    const lastEmail = localStorage.getItem('lastEmail');
-    if (lastEmail && emailEl && !emailEl.value) {
-      emailEl.value = lastEmail;
-    }
-    
-    // Check current session
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user?.email_confirmed_at) {
-      if (authForm) authForm.style.display = "none";
-      if (commentForm) commentForm.style.display = "block";
-    }
-    
-    // Initial comments load
-    await loadComments();
-    
-    console.log("Comments system ready for story:", storyId);
-  } catch (err) {
-    console.error("Initialization error:", err);
-  }
-}
-
-// Start the application
-if (!window.__appInitialized) {
-  init();
-  window.__appInitialized = true;
-}
+})();
 </script>
 
 </body>
