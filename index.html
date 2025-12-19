@@ -107,8 +107,6 @@ document.getElementById("submit-comment-btn").onclick = async () => {
   if (!comment) return alert("Please write a comment!");
 
   const { data: { user }, error: sessionError } = await supabase.auth.getUser();
-  console.log("Current user:", user, "Session error:", sessionError);
-
   if (sessionError) return alert("Error fetching user: " + sessionError.message);
   if (!user) return alert("You must be logged in to comment!");
   if (!user.email_confirmed_at) return alert("You must confirm your email before posting comments!");
@@ -130,27 +128,35 @@ document.getElementById("submit-comment-btn").onclick = async () => {
 
 // ------------------- LOAD COMMENTS -------------------
 async function loadComments() {
-  const { data, error } = await supabase
-    .from("story_comments")
-    .select(`content, created_at, profiles!inner(nickname)`)
-    .eq("story_id", storyId)
-    .order("created_at", { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from("story_comments")
+      .select(`content, created_at, profiles!inner(nickname)`) // join profiles
+      .eq("story_id", storyId)
+      .order("created_at", { ascending: false });
 
-  if (error) {
-    console.error("Load comments error:", error);
-    commentList.innerHTML = `<p style="color:red;">Error loading comments: ${error.message}</p>`;
-    return;
+    if (error) {
+      console.error("Load comments error:", error);
+      commentList.innerHTML = `<p style="color:red;">Error loading comments: ${error.message}</p>`;
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      commentList.innerHTML = "<p>No comments yet. Be the first!</p>";
+      return;
+    }
+
+    commentList.innerHTML = data.map(comment => `
+      <div class="comment">
+        <div class="author">${comment.profiles?.nickname || "Anonymous"}</div>
+        <div>${comment.content}</div>
+        <div class="timestamp">${new Date(comment.created_at).toLocaleString()}</div>
+      </div>
+    `).join("");
+
+  } catch (err) {
+    console.error("Unexpected error loading comments:", err);
   }
-
-  commentList.innerHTML = (data || []).map(c => `
-    <div class="comment">
-      <div class="author">${c.profiles?.nickname || "Anonymous"}</div>
-      <div>${c.content}</div>
-      <div class="timestamp">${new Date(c.created_at).toLocaleString()}</div>
-    </div>
-  `).join("");
-
-  if (!data || data.length === 0) commentList.innerHTML = "<p>No comments yet. Be the first!</p>";
 }
 
 // ------------------- AUTH STATE CHANGE -------------------
