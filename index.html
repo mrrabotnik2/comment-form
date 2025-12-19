@@ -130,7 +130,7 @@ async function loadComments() {
   try {
     const { data, error } = await supabase
       .from("story_comments")
-      .select(`content, created_at, profiles!inner(*)`) // use inner join with profiles table
+      .select(`content, created_at, profiles!inner(*)`) // dynamic alias
       .eq("story_id", storyId)
       .order("created_at", { ascending: false });
 
@@ -145,13 +145,19 @@ async function loadComments() {
       return;
     }
 
-    commentList.innerHTML = data.map(c => `
-      <div class="comment">
-        <div class="author">${c.profiles?.nickname || "Anonymous"}</div>
-        <div>${c.content}</div>
-        <div class="timestamp">${new Date(c.created_at).toLocaleString()}</div>
-      </div>
-    `).join("");
+    commentList.innerHTML = data.map(c => {
+      // Find the first property that starts with "profiles"
+      const profileKey = Object.keys(c).find(k => k.startsWith("profiles"));
+      const nickname = profileKey ? c[profileKey]?.nickname : "Anonymous";
+
+      return `
+        <div class="comment">
+          <div class="author">${nickname}</div>
+          <div>${c.content}</div>
+          <div class="timestamp">${new Date(c.created_at).toLocaleString()}</div>
+        </div>
+      `;
+    }).join("");
 
   } catch (err) {
     console.error("Unexpected error loading comments:", err);
