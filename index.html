@@ -28,11 +28,9 @@ button:hover { background:#45a049; }
 <div id="auth-form">
   <input id="email" type="email" placeholder="Email">
   <input id="password" type="password" placeholder="Password (min 6 chars)">
-  <input id="nickname" placeholder="Choose a nickname (for new users)">
-
+  <input id="nickname" placeholder="Choose a nickname (new users only)">
   <button id="signup-btn">Sign Up</button>
   <button id="login-btn">Log In</button>
-
   <p id="auth-error" class="error"></p>
   <p id="auth-success" class="success"></p>
 </div>
@@ -75,7 +73,7 @@ document.getElementById("signup-btn").onclick = async () => {
     return;
   }
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email: emailEl.value.trim(),
     password: passwordEl.value,
     options: {
@@ -84,8 +82,14 @@ document.getElementById("signup-btn").onclick = async () => {
     }
   });
 
+  console.log("Signup response:", data, error);
+
   if (error) errorEl.textContent = error.message;
-  else successEl.textContent = "Sign up successful! Check your email for the confirmation link.";
+  else {
+    successEl.textContent = "Sign up successful! Check your email for the confirmation link.";
+    // Clear password only for security
+    passwordEl.value = "";
+  }
 };
 
 // ------------------- LOG IN -------------------
@@ -104,6 +108,7 @@ document.getElementById("login-btn").onclick = async () => {
   });
 
   if (error) errorEl.textContent = error.message;
+  else passwordEl.value = "";
 };
 
 // ------------------- POST COMMENT -------------------
@@ -164,7 +169,6 @@ async function loadComments() {
 // ------------------- AUTH STATE -------------------
 supabase.auth.onAuthStateChange(async (event, session) => {
   if (event === "SIGNED_IN" && session?.user?.user_metadata?.nickname) {
-    // Insert or update profile with chosen nickname
     const nick = session.user.user_metadata.nickname;
     await supabase.from("profiles").upsert({ id: session.user.id, nickname: nick });
   }
@@ -172,6 +176,7 @@ supabase.auth.onAuthStateChange(async (event, session) => {
   if (session && session.user.email_confirmed_at) {
     authForm.style.display = "none";
     commentForm.style.display = "block";
+    successEl.textContent = `Welcome, ${session.user.user_metadata.nickname || session.user.email}!`;
   } else {
     authForm.style.display = "block";
     commentForm.style.display = "none";
