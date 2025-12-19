@@ -11,25 +11,9 @@
         body { font-family: sans-serif; background: #f9f9fb; padding: 10px; }
         .container { max-width: 500px; margin: 0 auto; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         input, textarea, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 5px; border: 1px solid #ddd; }
-        
-        /* THE ORANGE BUTTONS */
-        button { 
-            background: #FF8C00; /* Dark Orange */
-            color: white; 
-            border: none; 
-            font-weight: bold; 
-            cursor: pointer; 
-            transition: background 0.2s;
-        }
-        button:hover {
-            background: #E67E00; /* Slightly darker orange on hover */
-        }
-        #btn-signup {
-            background: #FF8C00; /* Keeping signup consistent with post button */
-        }
-
+        button { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; }
         .comment { border-bottom: 1px solid #eee; padding: 10px 0; font-size: 14px; }
-        .author { font-weight: bold; color: #FF8C00; } /* Orange name links */
+        .author { font-weight: bold; color: #007bff; }
         .hidden { display: none; }
         #status-bar { font-size: 12px; margin-bottom: 10px; color: #666; }
     </style>
@@ -42,14 +26,14 @@
             <input type="email" id="email" placeholder="Email">
             <input type="password" id="password" placeholder="Password">
             <input type="text" id="nick" placeholder="Display Name (First time only)">
-            <button id="btn-signup">Create Account</button>
+            <button id="btn-signup" style="background:#28a745">Create Account</button>
             <button id="btn-login">Log In</button>
         </div>
 
         <div id="comment-ui" class="hidden">
             <div style="display:flex; justify-content:space-between; font-size:12px;">
                 <span id="welcome-msg"></span>
-                <a href="#" id="btn-logout" style="color: #666;">Log Out</a>
+                <a href="#" id="btn-logout">Log Out</a>
             </div>
             <textarea id="msg" placeholder="Write a comment..."></textarea>
             <button id="btn-post">Post Comment</button>
@@ -120,7 +104,7 @@
             const { data } = await supabase.from('story_comments').select('*').eq('story_id', storyId).order('created_at', {ascending: false});
             document.getElementById('comments-box').innerHTML = data?.map(c => `
                 <div class="comment">
-                    <span class="author" style="color:#FF8C00">${c.nickname || 'Guest'}:</span> ${c.content}
+                    <span class="author">${c.nickname || 'Guest'}:</span> ${c.content}
                 </div>
             `).join('') || "No comments yet.";
         }
