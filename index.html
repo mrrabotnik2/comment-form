@@ -19,15 +19,20 @@
         }
 
         input, textarea, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 5px; border: 1px solid #ddd; outline: none; }
+        
+        /* Default Blue for Post Comment */
         button { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; }
         button:hover { background: #0056b3; }
+
+        /* Green for Sign Up and Log In */
+        #btn-signup, #btn-login-main { background: #28a745; border: none; color: white; }
+        #btn-signup:hover, #btn-login-main:hover { background: #218838; }
 
         .comment { border-bottom: 1px solid #eee; padding: 10px 0; font-size: 14px; position: relative; }
         .author { font-weight: bold; color: #007bff; margin-bottom: 2px; }
         .hidden { display: none; }
         #status-bar { font-size: 12px; margin-bottom: 10px; color: #666; text-align: center; }
         
-        /* Delete Button Style */
         .btn-delete {
             background: none;
             color: #ff4d4d;
@@ -41,7 +46,7 @@
             right: 0;
             top: 10px;
         }
-        .btn-delete:hover { background: none; text-decoration: underline; }
+        .btn-delete:hover { text-decoration: underline; background: none; }
     </style>
 </head>
 <body>
@@ -53,7 +58,7 @@
             <input type="password" id="password" placeholder="Password">
             <input type="text" id="nick" placeholder="Display Name">
             <button id="btn-signup">Create Account</button>
-            <button id="btn-login" style="background:none; color:#007bff; margin-top:5px; border:1px solid #007bff;">Log In</button>
+            <button id="btn-login-main">Log In</button>
         </div>
 
         <div id="comment-ui" class="hidden">
@@ -61,7 +66,7 @@
                 <span id="welcome-msg" style="font-weight:bold;"></span>
                 <a href="#" id="btn-logout" style="color: #666; text-decoration: none;">[Log Out]</a>
             </div>
-            <textarea id="msg" rows="3" placeholder="What did you think?"></textarea>
+            <textarea id="msg" rows="3" placeholder="Write a comment..."></textarea>
             <button id="btn-post">Post Comment</button>
         </div>
 
@@ -103,18 +108,23 @@
                 status.classList.remove('hidden');
                 status.textContent = "Sign in to leave a comment.";
             }
-            loadComments(); // Refresh list to show/hide delete buttons
+            loadComments(); 
         }
 
         document.getElementById('btn-signup').onclick = async () => {
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             const nickname = document.getElementById('nick').value.trim();
-            const { error } = await supabase.auth.signUp({ email, password, options: { data: { nickname } } });
+            if(!email || !password || !nickname) return alert("Please fill all fields");
+
+            const { error } = await supabase.auth.signUp({ 
+                email, password, options: { data: { nickname } } 
+            });
             if(error) alert(error.message);
+            else alert("Account created!");
         };
 
-        document.getElementById('btn-login').onclick = async () => {
+        document.getElementById('btn-login-main').onclick = async () => {
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -134,13 +144,12 @@
             else { document.getElementById('msg').value = ''; loadComments(); }
         };
 
-        // NEW: Delete Function
-        async function deleteComment(id) {
+        window.deleteComment = async (id) => {
             if(!confirm("Delete this comment?")) return;
             const { error } = await supabase.from('story_comments').delete().eq('id', id);
             if(error) alert(error.message);
             else loadComments();
-        }
+        };
 
         async function loadComments() {
             const box = document.getElementById('comments-box');
@@ -150,10 +159,8 @@
             if(error) box.textContent = "Error loading comments.";
             else {
                 box.innerHTML = data.map(c => {
-                    // Show delete button only if current user owns the comment
                     const isOwner = user && user.id === c.user_id;
                     const deleteBtn = isOwner ? `<button class="btn-delete" onclick="deleteComment('${c.id}')">Delete</button>` : '';
-                    
                     return `
                         <div class="comment">
                             <div class="author">${c.nickname || 'Guest'}</div>
