@@ -17,10 +17,7 @@ button:hover { background:#45a049; }
 .author { font-weight:bold; }
 .timestamp { font-size:12px; color:#666; }
 #comment-form { display:none; margin-top:15px; }
-#debug-info { font-size:12px; color:#666; background:#f0f0f0; padding:10px; margin-top:10px; border-radius:4px; }
-.status-confirmed { color:green; }
-.status-pending { color:orange; }
-.status-not-logged-in { color:red; }
+#status { background:#f0f0f0; padding:10px; border-radius:4px; margin-bottom:15px; font-size:14px; }
 </style>
 </head>
 <body>
@@ -28,11 +25,7 @@ button:hover { background:#45a049; }
 <div class="container">
 <h2>Comments</h2>
 
-<!-- DEBUG INFO -->
-<div id="debug-info">
-    <strong>Status:</strong> <span id="debug-status">Loading...</span><br>
-    <span id="debug-details"></span>
-</div>
+<div id="status">Loading comments system...</div>
 
 <!-- AUTH FORM -->
 <div id="auth-form">
@@ -41,14 +34,13 @@ button:hover { background:#45a049; }
   <input id="nickname" placeholder="Choose a nickname (new users only)">
   <button id="signup-btn">Sign Up</button>
   <button id="login-btn">Log In</button>
-  <button id="logout-btn" style="background:#888; display:none;">Log Out</button>
+  <button id="logout-btn" style="background:#888; margin-top:5px; display:none;">Log Out</button>
   <p id="auth-error" class="error"></p>
   <p id="auth-success" class="success"></p>
 </div>
 
 <!-- COMMENT FORM -->
 <div id="comment-form">
-  <p id="comment-instruction">Post your comment below:</p>
   <textarea id="comment" rows="4" placeholder="Write your comment..."></textarea>
   <button id="submit-comment-btn">Post Comment</button>
   <p id="comment-error" class="error" style="display:none;"></p>
@@ -58,432 +50,308 @@ button:hover { background:#45a049; }
 </div>
 
 <script>
-// =================== INITIALIZATION ===================
+// SIMPLE INITIALIZATION - NO COMPLEX PATTERNS
+console.log("Starting comments system...");
+
+// Supabase configuration
 const SUPABASE_URL = "https://pidzgdrdgqgsayfoxqba.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZHpnZHJkZ3Fnc2F5Zm94cWJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NDI1OTcsImV4cCI6MjA4MTIxODU5N30.6sNn3jbNVfl-MEowIEjUknEKHlOcfKvVRa5pFqCHiw0";
 
-let supabase;
-try {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    console.log("✅ Supabase initialized");
-} catch (error) {
-    console.error("❌ Supabase init error:", error);
-    updateDebugInfo("error", "Failed to initialize database");
-    throw error;
+// Create Supabase client
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+console.log("Supabase client created");
+
+// Get story ID
+const urlParams = new URLSearchParams(window.location.search);
+const storyId = urlParams.get('story') || 'default';
+console.log("Story ID:", storyId);
+
+// Update status display
+function updateStatus(message, type = 'info') {
+    const statusEl = document.getElementById('status');
+    statusEl.textContent = message;
+    statusEl.className = type;
+    console.log("Status:", message);
 }
 
-// =================== ELEMENTS ===================
-const storyId = new URLSearchParams(window.location.search).get("story") || "default";
-const emailEl = document.getElementById("email");
-const passwordEl = document.getElementById("password");
-const nicknameEl = document.getElementById("nickname");
-const authForm = document.getElementById("auth-form");
-const commentForm = document.getElementById("comment-form");
-const commentInput = document.getElementById("comment");
-const commentList = document.getElementById("comment-list");
-const errorEl = document.getElementById("auth-error");
-const successEl = document.getElementById("auth-success");
-const commentErrorEl = document.getElementById("comment-error");
-const commentInstruction = document.getElementById("comment-instruction");
-const debugStatus = document.getElementById("debug-status");
-const debugDetails = document.getElementById("debug-details");
-const logoutBtn = document.getElementById("logout-btn");
-
-// =================== DEBUG FUNCTIONS ===================
-function updateDebugInfo(status, details) {
-    debugStatus.textContent = status;
-    debugStatus.className = `status-${status.toLowerCase().replace(/\s+/g, '-')}`;
-    debugDetails.textContent = details;
-    console.log(`DEBUG: ${status} - ${details}`);
-}
-
-// =================== EVENT LISTENERS ===================
-document.getElementById("signup-btn").addEventListener("click", handleSignup);
-document.getElementById("login-btn").addEventListener("click", handleLogin);
-document.getElementById("logout-btn").addEventListener("click", handleLogout);
-document.getElementById("submit-comment-btn").addEventListener("click", handleCommentSubmit);
-
-// =================== SIGNUP WITH DEBUG ===================
-async function handleSignup() {
-    errorEl.textContent = "";
-    successEl.textContent = "";
+// Wait for DOM to load
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("DOM loaded, setting up event listeners");
     
-    const email = emailEl.value.trim();
-    const password = passwordEl.value;
-    const nickname = nicknameEl.value.trim();
+    // Get elements
+    const emailEl = document.getElementById('email');
+    const passwordEl = document.getElementById('password');
+    const nicknameEl = document.getElementById('nickname');
+    const authForm = document.getElementById('auth-form');
+    const commentForm = document.getElementById('comment-form');
+    const commentInput = document.getElementById('comment');
+    const commentList = document.getElementById('comment-list');
+    const errorEl = document.getElementById('auth-error');
+    const successEl = document.getElementById('auth-success');
+    const logoutBtn = document.getElementById('logout-btn');
     
-    if (!email || !password || !nickname) {
-        errorEl.textContent = "Please fill all fields";
-        return;
-    }
-    
-    if (password.length < 6) {
-        errorEl.textContent = "Password must be at least 6 characters";
-        return;
-    }
-    
-    updateDebugInfo("processing", "Creating account...");
-    
-    const btn = document.getElementById("signup-btn");
-    btn.disabled = true;
-    btn.textContent = "Signing up...";
-    
-    try {
-        console.log("📧 Attempting signup for:", email);
+    // Sign Up
+    document.getElementById('signup-btn').addEventListener('click', async function() {
+        console.log("Sign up clicked");
+        errorEl.textContent = '';
+        successEl.textContent = '';
         
-        // IMPORTANT: Use the exact URL where users will click the confirmation link
-        const { data, error } = await supabase.auth.signUp({
-            email: email,
-            password: password,
-            options: {
-                data: { nickname: nickname },
-                emailRedirectTo: window.location.origin  // This should be https://comments.mystoriesandtales.com
-            }
-        });
+        const email = emailEl.value.trim();
+        const password = passwordEl.value;
+        const nickname = nicknameEl.value.trim();
         
-        console.log("📨 Signup response:", { data, error });
+        if (!email || !password || !nickname) {
+            errorEl.textContent = 'Please fill all fields';
+            return;
+        }
         
-        if (error) {
-            errorEl.textContent = error.message;
-            updateDebugInfo("error", `Signup failed: ${error.message}`);
-        } else {
-            updateDebugInfo("success", "Account created! Check email for confirmation.");
+        updateStatus('Creating account...', 'info');
+        
+        try {
+            const { data, error } = await supabase.auth.signUp({
+                email: email,
+                password: password,
+                options: {
+                    data: { nickname: nickname },
+                    emailRedirectTo: 'https://comments.mystoriesandtales.com'
+                }
+            });
             
-            if (data.user) {
-                // Show user details in debug
-                console.log("👤 User created:", {
-                    id: data.user.id,
-                    email: data.user.email,
-                    confirmed: data.user.email_confirmed_at,
-                    metadata: data.user.user_metadata
-                });
+            if (error) {
+                errorEl.textContent = error.message;
+                updateStatus('Sign up failed: ' + error.message, 'error');
+            } else {
+                successEl.innerHTML = `
+                    <strong>✓ Sign up successful!</strong><br>
+                    Check <strong>${email}</strong> for the confirmation email.<br>
+                    <small>Check spam folder if you don't see it.</small>
+                `;
+                updateStatus('Account created! Check email for confirmation.', 'success');
                 
                 // Create profile
-                try {
-                    const { error: profileError } = await supabase
-                        .from('profiles')
-                        .upsert({
+                if (data.user) {
+                    try {
+                        await supabase.from('profiles').upsert({
                             id: data.user.id,
                             nickname: nickname,
-                            email: email,
-                            created_at: new Date().toISOString()
+                            email: email
                         });
-                    
-                    if (profileError) {
-                        console.log("ℹ️ Profile note:", profileError.message);
+                    } catch (e) {
+                        console.log("Profile note:", e.message);
                     }
-                } catch (profileErr) {
-                    console.log("ℹ️ Profile creation:", profileErr.message);
                 }
                 
-                successEl.innerHTML = `
-                    ✅ <strong>Sign up successful!</strong><br>
-                    We've sent a confirmation email to:<br>
-                    <strong>${email}</strong><br>
-                    <small>Check your inbox (and spam folder) for the confirmation link.</small>
-                `;
-                
-                localStorage.setItem('lastEmail', email);
-                passwordEl.value = "";
-                
-                // Update UI based on confirmation status
-                if (data.user.email_confirmed_at) {
-                    updateDebugInfo("confirmed", "Email already confirmed!");
-                    authForm.style.display = 'none';
-                    commentForm.style.display = 'block';
-                } else {
-                    updateDebugInfo("pending", "Waiting for email confirmation...");
-                }
+                // Clear password
+                passwordEl.value = '';
             }
+        } catch (err) {
+            errorEl.textContent = 'Network error. Please try again.';
+            updateStatus('Network error', 'error');
+            console.error(err);
         }
-    } catch (err) {
-        errorEl.textContent = "Network error. Please try again.";
-        updateDebugInfo("error", `Network error: ${err.message}`);
-        console.error("❌ Signup catch error:", err);
-    } finally {
-        btn.disabled = false;
-        btn.textContent = "Sign Up";
-    }
-}
-
-// =================== LOGIN ===================
-async function handleLogin() {
-    errorEl.textContent = "";
-    successEl.textContent = "";
+    });
     
-    const email = emailEl.value.trim();
-    const password = passwordEl.value;
-    
-    if (!email || !password) {
-        errorEl.textContent = "Please enter email and password";
-        return;
-    }
-    
-    updateDebugInfo("processing", "Logging in...");
-    
-    const btn = document.getElementById("login-btn");
-    btn.disabled = true;
-    btn.textContent = "Logging in...";
-    
-    try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: email,
-            password: password
-        });
+    // Log In
+    document.getElementById('login-btn').addEventListener('click', async function() {
+        console.log("Log in clicked");
+        errorEl.textContent = '';
+        successEl.textContent = '';
         
-        if (error) {
-            errorEl.textContent = error.message;
-            updateDebugInfo("error", `Login failed: ${error.message}`);
-        } else {
-            updateDebugInfo("success", `Logged in as ${email}`);
-            successEl.textContent = "Login successful!";
-            localStorage.setItem('lastEmail', email);
-            passwordEl.value = "";
-        }
-    } catch (err) {
-        errorEl.textContent = "Network error. Please try again.";
-        updateDebugInfo("error", `Network error: ${err.message}`);
-        console.error(err);
-    } finally {
-        btn.disabled = false;
-        btn.textContent = "Log In";
-    }
-}
-
-// =================== LOGOUT ===================
-async function handleLogout() {
-    try {
-        await supabase.auth.signOut();
-        updateDebugInfo("logged-out", "Successfully logged out");
-    } catch (err) {
-        console.error("Logout error:", err);
-    }
-}
-
-// =================== POST COMMENT ===================
-async function handleCommentSubmit() {
-    const content = commentInput.value.trim();
-    if (!content) {
-        showCommentError("Please write a comment!");
-        return;
-    }
-    
-    updateDebugInfo("processing", "Posting comment...");
-    
-    const btn = document.getElementById("submit-comment-btn");
-    btn.disabled = true;
-    btn.textContent = "Posting...";
-    commentErrorEl.style.display = 'none';
-    
-    try {
-        // 1. Get current user
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const email = emailEl.value.trim();
+        const password = passwordEl.value;
         
-        if (userError) {
-            showCommentError("Session error. Please log in again.");
-            updateDebugInfo("error", "Session expired");
-            authForm.style.display = 'block';
-            commentForm.style.display = 'none';
+        if (!email || !password) {
+            errorEl.textContent = 'Please enter email and password';
             return;
         }
         
-        if (!user) {
-            showCommentError("Please log in to comment.");
-            updateDebugInfo("not-logged-in", "No user session");
-            authForm.style.display = 'block';
-            commentForm.style.display = 'none';
-            return;
-        }
+        updateStatus('Logging in...', 'info');
         
-        console.log("👤 Current user check:", {
-            email: user.email,
-            confirmed: user.email_confirmed_at,
-            confirmedAt: user.email_confirmed_at,
-            id: user.id
-        });
-        
-        // 2. Check email confirmation
-        if (!user.email_confirmed_at) {
-            const msg = `Please confirm your email first. Check ${user.email} for the confirmation link.`;
-            showCommentError(msg);
-            updateDebugInfo("pending", `Email not confirmed for ${user.email}`);
-            return;
-        }
-        
-        // 3. Post the comment
-        updateDebugInfo("processing", `Posting to story: ${storyId}`);
-        
-        const { error: insertError } = await supabase
-            .from("story_comments")
-            .insert({
-                story_id: storyId,
-                user_id: user.id,
-                content: content,
-                created_at: new Date().toISOString()
+        try {
+            const { error } = await supabase.auth.signInWithPassword({
+                email: email,
+                password: password
             });
-        
-        if (insertError) {
-            showCommentError("Failed to post: " + insertError.message);
-            updateDebugInfo("error", `Post failed: ${insertError.message}`);
-            console.error("❌ Insert error:", insertError);
-        } else {
-            // Success!
-            commentInput.value = "";
-            loadComments();
             
-            updateDebugInfo("success", "Comment posted!");
-            commentErrorEl.style.display = 'block';
-            commentErrorEl.className = 'success';
-            commentErrorEl.innerHTML = "✅ Comment posted successfully!";
-            setTimeout(() => {
-                commentErrorEl.style.display = 'none';
-            }, 3000);
+            if (error) {
+                errorEl.textContent = error.message;
+                updateStatus('Login failed: ' + error.message, 'error');
+            } else {
+                successEl.textContent = 'Login successful!';
+                updateStatus('Logged in successfully', 'success');
+                passwordEl.value = '';
+            }
+        } catch (err) {
+            errorEl.textContent = 'Network error. Please try again.';
+            updateStatus('Network error', 'error');
+            console.error(err);
         }
-    } catch (err) {
-        showCommentError("Error: " + err.message);
-        updateDebugInfo("error", `Exception: ${err.message}`);
-        console.error("❌ Post error:", err);
-    } finally {
-        btn.disabled = false;
-        btn.textContent = "Post Comment";
-    }
-}
-
-function showCommentError(message) {
-    commentErrorEl.innerHTML = message;
-    commentErrorEl.style.display = 'block';
-    commentErrorEl.className = 'error';
-}
-
-// =================== LOAD COMMENTS ===================
-async function loadComments() {
-    try {
-        updateDebugInfo("loading", "Fetching comments...");
-        
-        const { data, error } = await supabase
-            .from("story_comments")
-            .select(`
-                content, 
-                created_at,
-                profiles (nickname)
-            `)
-            .eq("story_id", storyId)
-            .order("created_at", { ascending: false });
-        
-        if (error) throw error;
-        
-        if (!data || data.length === 0) {
-            commentList.innerHTML = "<p>No comments yet. Be the first!</p>";
-            updateDebugInfo("loaded", "No comments found");
-        } else {
-            commentList.innerHTML = data.map(comment => `
-                <div class="comment">
-                    <div class="author">${comment.profiles?.nickname || 'Anonymous'}</div>
-                    <div>${comment.content}</div>
-                    <div class="timestamp">${new Date(comment.created_at).toLocaleString()}</div>
-                </div>
-            `).join('');
-            updateDebugInfo("loaded", `${data.length} comments loaded`);
-        }
-    } catch (err) {
-        console.error("❌ Load comments error:", err);
-        commentList.innerHTML = `<p class="error">Error loading comments</p>`;
-        updateDebugInfo("error", `Failed to load: ${err.message}`);
-    }
-}
-
-// =================== AUTH STATE ===================
-supabase.auth.onAuthStateChange(async (event, session) => {
-    console.log("🔐 Auth event:", event, session?.user?.email);
+    });
     
-    if (event === "SIGNED_IN" && session?.user) {
-        console.log("📋 User details:", {
-            email: session.user.email,
-            confirmed: session.user.email_confirmed_at,
-            confirmedAt: session.user.email_confirmed_at,
-            metadata: session.user.user_metadata
-        });
-        
-        // Show logout button
-        logoutBtn.style.display = 'inline-block';
-        
-        // Show appropriate message
-        if (session.user.email_confirmed_at) {
-            authForm.style.display = "none";
-            commentForm.style.display = "block";
-            commentInstruction.textContent = `Posting as: ${session.user.user_metadata?.nickname || session.user.email}`;
-            updateDebugInfo("confirmed", `Ready to comment as ${session.user.email}`);
-        } else {
-            authForm.style.display = "block";
-            commentForm.style.display = "none";
-            updateDebugInfo("pending", `Email not confirmed: ${session.user.email}`);
-            successEl.innerHTML = `
-                ⚠️ <strong>Email not confirmed</strong><br>
-                Check <strong>${session.user.email}</strong> for the confirmation link.<br>
-                <small>Check spam folder if you don't see it.</small>
-            `;
+    // Log Out
+    logoutBtn.addEventListener('click', async function() {
+        await supabase.auth.signOut();
+        updateStatus('Logged out', 'info');
+    });
+    
+    // Post Comment
+    document.getElementById('submit-comment-btn').addEventListener('click', async function() {
+        const content = commentInput.value.trim();
+        if (!content) {
+            alert('Please write a comment!');
+            return;
         }
-    } else if (event === "SIGNED_OUT") {
-        authForm.style.display = "block";
-        commentForm.style.display = "none";
-        logoutBtn.style.display = 'none';
-        successEl.textContent = "";
-        updateDebugInfo("not-logged-in", "Please sign in to comment");
-    } else if (event === "USER_UPDATED") {
-        // When user confirms email
-        if (session?.user?.email_confirmed_at) {
-            authForm.style.display = "none";
-            commentForm.style.display = "block";
-            commentInstruction.textContent = `Posting as: ${session.user.user_metadata?.nickname || session.user.email}`;
-            updateDebugInfo("confirmed", `✅ Email confirmed! Ready to comment.`);
-            successEl.textContent = "✅ Email confirmed! You can now post comments.";
+        
+        updateStatus('Posting comment...', 'info');
+        
+        try {
+            // Check user
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (!user) {
+                alert('Please log in first!');
+                authForm.style.display = 'block';
+                commentForm.style.display = 'none';
+                return;
+            }
+            
+            if (!user.email_confirmed_at) {
+                alert(`Please confirm your email first. Check ${user.email} for the confirmation link.`);
+                return;
+            }
+            
+            // Post comment
+            const { error } = await supabase
+                .from('story_comments')
+                .insert({
+                    story_id: storyId,
+                    user_id: user.id,
+                    content: content,
+                    created_at: new Date().toISOString()
+                });
+            
+            if (error) {
+                alert('Error: ' + error.message);
+                updateStatus('Failed to post: ' + error.message, 'error');
+            } else {
+                commentInput.value = '';
+                loadComments();
+                updateStatus('Comment posted!', 'success');
+            }
+        } catch (err) {
+            alert('Error: ' + err.message);
+            updateStatus('Error: ' + err.message, 'error');
+            console.error(err);
+        }
+    });
+    
+    // Load comments function
+    async function loadComments() {
+        try {
+            updateStatus('Loading comments...', 'info');
+            
+            const { data, error } = await supabase
+                .from('story_comments')
+                .select(`
+                    content,
+                    created_at,
+                    profiles (nickname)
+                `)
+                .eq('story_id', storyId)
+                .order('created_at', { ascending: false });
+            
+            if (error) throw error;
+            
+            if (!data || data.length === 0) {
+                commentList.innerHTML = '<p>No comments yet. Be the first!</p>';
+                updateStatus('No comments found', 'info');
+            } else {
+                commentList.innerHTML = data.map(comment => `
+                    <div class="comment">
+                        <div class="author">${comment.profiles?.nickname || 'Anonymous'}</div>
+                        <div>${comment.content}</div>
+                        <div class="timestamp">${new Date(comment.created_at).toLocaleString()}</div>
+                    </div>
+                `).join('');
+                updateStatus(`${data.length} comments loaded`, 'success');
+            }
+        } catch (err) {
+            commentList.innerHTML = '<p class="error">Error loading comments</p>';
+            updateStatus('Failed to load comments: ' + err.message, 'error');
+            console.error(err);
         }
     }
     
-    loadComments();
-});
-
-// =================== INITIAL LOAD ===================
-async function initApp() {
-    try {
-        // Restore last email
-        const lastEmail = localStorage.getItem('lastEmail');
-        if (lastEmail && emailEl && !emailEl.value) {
-            emailEl.value = lastEmail;
-        }
+    // Auth state listener
+    supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log("Auth event:", event);
         
-        // Check existing session
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log("🔍 Initial session check:", session?.user?.email);
-        
-        if (session?.user) {
-            updateDebugInfo("checking", `Found session for ${session.user.email}`);
+        if (event === 'SIGNED_IN' && session?.user) {
+            console.log("User signed in:", session.user.email);
+            
+            // Show logout button
+            logoutBtn.style.display = 'inline-block';
             
             if (session.user.email_confirmed_at) {
-                authForm.style.display = "none";
-                commentForm.style.display = "block";
-                commentInstruction.textContent = `Posting as: ${session.user.user_metadata?.nickname || session.user.email}`;
-                logoutBtn.style.display = 'inline-block';
-                updateDebugInfo("confirmed", `Ready: ${session.user.email}`);
+                // Email confirmed - show comment form
+                authForm.style.display = 'none';
+                commentForm.style.display = 'block';
+                updateStatus(`Ready to comment as ${session.user.email}`, 'success');
             } else {
-                updateDebugInfo("pending", `Email not confirmed: ${session.user.email}`);
-                successEl.innerHTML = `Please confirm ${session.user.email}`;
+                // Email not confirmed
+                authForm.style.display = 'block';
+                commentForm.style.display = 'none';
+                updateStatus(`Please confirm ${session.user.email}`, 'info');
+                successEl.innerHTML = `
+                    <strong>Email confirmation needed</strong><br>
+                    Check <strong>${session.user.email}</strong> for the confirmation link.
+                `;
             }
-        } else {
-            updateDebugInfo("not-logged-in", "Please sign in or create account");
+        } else if (event === 'SIGNED_OUT') {
+            authForm.style.display = 'block';
+            commentForm.style.display = 'none';
+            logoutBtn.style.display = 'none';
+            successEl.textContent = '';
+            updateStatus('Please sign in to comment', 'info');
         }
         
-        // Load comments
-        await loadComments();
-        
-    } catch (err) {
-        console.error("❌ Init error:", err);
-        updateDebugInfo("error", `Init failed: ${err.message}`);
+        loadComments();
+    });
+    
+    // Initial load
+    async function init() {
+        try {
+            // Check for existing session
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            if (session?.user) {
+                if (session.user.email_confirmed_at) {
+                    authForm.style.display = 'none';
+                    commentForm.style.display = 'block';
+                    logoutBtn.style.display = 'inline-block';
+                    updateStatus(`Welcome back, ${session.user.email}`, 'success');
+                } else {
+                    updateStatus(`Please confirm ${session.user.email}`, 'info');
+                }
+            }
+            
+            // Load comments
+            await loadComments();
+            
+            updateStatus('Comments system ready', 'success');
+        } catch (err) {
+            updateStatus('Initialization error: ' + err.message, 'error');
+            console.error("Init error:", err);
+        }
     }
-}
+    
+    // Start the app
+    init();
+    
+    console.log("Event listeners setup complete");
+});
 
-// Start the app
-initApp();
+console.log("Script loaded successfully");
 </script>
 
 </body>
