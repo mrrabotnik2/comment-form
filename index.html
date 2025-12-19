@@ -4,50 +4,25 @@
 <meta charset="UTF-8">
 <title>Story Comments</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f4f4f9;
-  padding: 20px;
-}
-.container {
-  max-width: 600px;
-  margin: auto;
-  background: #fff;
-  padding: 20px;
-  border-radius: 8px;
-}
-input, textarea, button {
-  width: 100%;
-  padding: 12px;
-  margin-top: 8px;
-  font-size: 15px;
-}
-button {
-  background: #4CAF50;
-  color: white;
-  border: none;
-  cursor: pointer;
-}
-button:hover { background: #45a049; }
-.error { color: red; }
-.success { color: green; }
-.comment {
-  border-bottom: 1px solid #ddd;
-  padding: 10px 0;
-}
-.author { font-weight: bold; }
-.timestamp { font-size: 12px; color: #666; }
-#comment-form { display: none; }
+body { font-family: Arial; background:#f4f4f9; padding:20px; }
+.container { max-width:600px; margin:auto; background:#fff; padding:20px; border-radius:8px; }
+input, textarea, button { width:100%; padding:12px; margin-top:8px; font-size:15px; }
+button { background:#4CAF50; color:white; border:none; cursor:pointer; }
+button:hover { background:#45a049; }
+.error { color:red; }
+.success { color:green; }
+.comment { border-bottom:1px solid #ddd; padding:10px 0; }
+.author { font-weight:bold; }
+.timestamp { font-size:12px; color:#666; }
+#comment-form { display:none; }
 </style>
 </head>
-
 <body>
-<div class="container">
 
+<div class="container">
 <h2>Comments</h2>
 
 <!-- AUTH FORM -->
@@ -70,20 +45,16 @@ button:hover { background: #45a049; }
 </div>
 
 <div id="comment-list"></div>
-
 </div>
 
 <script>
-/* ---------- SUPABASE ---------- */
 const supabase = window.supabase.createClient(
   "https://pidzgdrdgqgsayfoxqba.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZHpnZHJkZ3Fnc2F5Zm94cWJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NDI1OTcsImV4cCI6MjA4MTIxODU5N30.6sNn3jbNVfl-MEowIEjUknEKHlOcfKvVRa5pFqCHiw0"
 );
 
-/* ---------- STORY ID ---------- */
 const storyId = new URLSearchParams(window.location.search).get("story") || "default";
 
-/* ---------- ELEMENTS ---------- */
 const email = document.getElementById("email");
 const password = document.getElementById("password");
 const nickname = document.getElementById("nickname");
@@ -94,20 +65,19 @@ const commentForm = document.getElementById("comment-form");
 const commentInput = document.getElementById("comment");
 const commentList = document.getElementById("comment-list");
 
-/* ---------- SIGN UP ---------- */
+/* SIGN UP */
 document.getElementById("signup-btn").onclick = async () => {
   errorEl.textContent = "";
   successEl.textContent = "";
 
-  const nick = nickname.value.trim();
-  if (!nick) { errorEl.textContent = "Please choose a nickname."; return; }
+  if (!nickname.value.trim()) { errorEl.textContent="Please choose a nickname"; return; }
 
   const { error } = await supabase.auth.signUp({
     email: email.value,
     password: password.value,
     options: {
       emailRedirectTo: window.location.href,
-      data: { nickname: nick }
+      data: { nickname: nickname.value.trim() }
     }
   });
 
@@ -115,7 +85,7 @@ document.getElementById("signup-btn").onclick = async () => {
   else successEl.textContent = "Check your email and click the confirmation link to activate your account.";
 };
 
-/* ---------- LOG IN ---------- */
+/* LOG IN */
 document.getElementById("login-btn").onclick = async () => {
   errorEl.textContent = "";
   successEl.textContent = "";
@@ -128,7 +98,7 @@ document.getElementById("login-btn").onclick = async () => {
   if (error) errorEl.textContent = error.message;
 };
 
-/* ---------- POST COMMENT ---------- */
+/* POST COMMENT */
 document.getElementById("submit-comment-btn").onclick = async () => {
   const comment = commentInput.value.trim();
   if (!comment) return alert("Please write a comment!");
@@ -141,25 +111,24 @@ document.getElementById("submit-comment-btn").onclick = async () => {
 
   const { error } = await supabase.from("story_comments").insert({
     content: comment,
-    story_id: storyId
+    story_id: storyId,
+    user_id: user.id
   });
 
-  if (error) alert("Error posting comment: " + error.message);
-  else {
+  if (error) {
+    alert("Error posting comment: " + error.message);
+    console.error("Insert error:", error);
+  } else {
     commentInput.value = "";
     loadComments();
   }
 };
 
-/* ---------- LOAD COMMENTS ---------- */
+/* LOAD COMMENTS */
 async function loadComments() {
   const { data } = await supabase
     .from("story_comments")
-    .select(`
-      content,
-      created_at,
-      profiles ( nickname )
-    `)
+    .select(`content, created_at, profiles(nickname)`)
     .eq("story_id", storyId)
     .order("created_at", { ascending: false });
 
@@ -172,15 +141,13 @@ async function loadComments() {
   `).join("");
 }
 
-/* ---------- AUTH STATE ---------- */
+/* AUTH STATE CHANGE */
 supabase.auth.onAuthStateChange(async (event, session) => {
-  // Save nickname to profiles table after first confirmed login
   if (event === "SIGNED_IN" && session?.user?.user_metadata?.nickname) {
     const nick = session.user.user_metadata.nickname;
     await supabase.from("profiles").upsert({ id: session.user.id, nickname: nick });
   }
 
-  // Show comment form only if email confirmed
   if (session && session.user.email_confirmed_at) {
     authForm.style.display = "none";
     commentForm.style.display = "block";
@@ -192,7 +159,7 @@ supabase.auth.onAuthStateChange(async (event, session) => {
   loadComments();
 });
 
-/* ---------- INITIAL ---------- */
+/* INITIAL LOAD */
 loadComments();
 </script>
 </body>
