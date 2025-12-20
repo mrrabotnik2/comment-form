@@ -6,61 +6,29 @@
     <title>Story Comments</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* General Layout */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: sans-serif; background: #f9f9fb; padding: 10px; }
-        
-        .container { 
-            max-width: 500px; 
-            margin: 20px auto; /* Centered form */
-            background: #fff; 
-            padding: 15px; 
-            border-radius: 8px; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
-        }
-
+        .container { max-width: 500px; margin: 20px auto; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         input, textarea, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 5px; border: 1px solid #ddd; outline: none; }
         
-        /* Blue Buttons (Login & Post) */
-        button, #btn-login-main { 
-            background: #007bff; 
-            color: white; 
-            border: none; 
-            font-weight: bold; 
-            cursor: pointer; 
-            transition: background 0.2s; 
-        }
+        /* Blue Buttons */
+        button, #btn-login-main { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; }
         button:hover, #btn-login-main:hover { background: #0056b3; }
 
-        /* Green Button (Create Account) */
-        #btn-signup { 
-            background: #28a745; 
-        }
-        #btn-signup:hover { 
-            background: #218838; 
-        }
+        /* Green Button */
+        #btn-signup { background: #28a745; }
+        #btn-signup:hover { background: #218838; }
 
-        /* Comment Section Styles */
         .comment { border-bottom: 1px solid #eee; padding: 10px 0; font-size: 14px; position: relative; }
         .author { font-weight: bold; color: #007bff; margin-bottom: 2px; }
         .hidden { display: none; }
         #status-bar { font-size: 12px; margin-bottom: 10px; color: #666; text-align: center; }
         
-        /* Delete Link Style */
         .btn-delete {
-            background: none;
-            color: #ff4d4d;
-            border: none;
-            font-size: 11px;
-            width: auto;
-            padding: 0;
-            margin: 0;
-            cursor: pointer;
-            position: absolute;
-            right: 0;
-            top: 10px;
+            background: none; color: #ff4d4d; border: none; font-size: 11px; width: auto; 
+            padding: 0; margin: 0; cursor: pointer; position: absolute; right: 0; top: 10px;
         }
-        .btn-delete:hover { text-decoration: underline; background: none; }
+        .btn-delete:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -99,6 +67,22 @@
         const supabase = window.supabase.createClient(CONFIG.url, CONFIG.key);
         const storyId = new URLSearchParams(window.location.search).get('story') || 'default';
 
+        // GLOBAL DELETE FUNCTION
+        window.handleDelete = async (id) => {
+            if(!confirm("Are you sure you want to delete this comment?")) return;
+            
+            const { error } = await supabase
+                .from('story_comments')
+                .delete()
+                .eq('id', id);
+
+            if(error) {
+                alert("Delete failed: " + error.message);
+            } else {
+                loadComments();
+            }
+        };
+
         async function init() {
             const { data: { session } } = await supabase.auth.getSession();
             updateUI(session?.user);
@@ -129,11 +113,7 @@
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             const nickname = document.getElementById('nick').value.trim();
-            if(!email || !password || !nickname) return alert("Please fill all fields");
-
-            const { error } = await supabase.auth.signUp({ 
-                email, password, options: { data: { nickname } } 
-            });
+            const { error } = await supabase.auth.signUp({ email, password, options: { data: { nickname } } });
             if(error) alert(error.message);
             else alert("Account created!");
         };
@@ -158,14 +138,6 @@
             else { document.getElementById('msg').value = ''; loadComments(); }
         };
 
-        // Attached to window so it's globally accessible for the onclick event
-        window.deleteComment = async (id) => {
-            if(!confirm("Delete this comment?")) return;
-            const { error } = await supabase.from('story_comments').delete().eq('id', id);
-            if(error) alert("Error: " + error.message);
-            else loadComments();
-        };
-
         async function loadComments() {
             const box = document.getElementById('comments-box');
             const { data: { user } } = await supabase.auth.getUser();
@@ -175,7 +147,7 @@
             else {
                 box.innerHTML = data.map(c => {
                     const isOwner = user && user.id === c.user_id;
-                    const deleteBtn = isOwner ? `<button class="btn-delete" onclick="window.deleteComment('${c.id}')">Delete</button>` : '';
+                    const deleteBtn = isOwner ? `<button class="btn-delete" onclick="window.handleDelete('${c.id}')">Delete</button>` : '';
                     return `
                         <div class="comment">
                             <div class="author">${c.nickname || 'Guest'}</div>
