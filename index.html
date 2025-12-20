@@ -26,13 +26,14 @@
         .hidden { display: none; }
         #status-bar { font-size: 12px; margin-bottom: 10px; color: #666; text-align: center; }
         
-        /* Like Button Style */
         .like-container { margin-top: 8px; display: flex; align-items: center; gap: 5px; }
         .btn-like { background: none; border: 1px solid #ddd; color: #666; font-size: 12px; width: auto; padding: 2px 8px; margin: 0; cursor: pointer; display: inline-flex; align-items: center; }
         .btn-like:hover { background: #f0f0f0; }
 
         .btn-delete { background: none; color: #ff4d4d; border: none; font-size: 11px; width: auto; padding: 0; margin: 0; cursor: pointer; position: absolute; right: 0; top: 12px; }
         .btn-delete:hover { text-decoration: underline; }
+
+        #comment-count-header { font-size: 15px; display: block; margin-bottom: 10px; border-bottom: 2px solid #f0f0f0; padding-bottom: 5px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -57,7 +58,7 @@
         </div>
 
         <div id="list" style="margin-top:20px;">
-            <strong style="font-size: 15px; display: block; margin-bottom: 10px; border-bottom: 2px solid #f0f0f0; padding-bottom: 5px;">Community Comments</strong>
+            <div id="comment-count-header">Comments (0)</div>
             <div id="comments-box">Loading...</div>
         </div>
     </div>
@@ -71,22 +72,15 @@
         const supabase = window.supabase.createClient(CONFIG.url, CONFIG.key);
         const storyId = new URLSearchParams(window.location.search).get('story') || 'default';
 
-        // LIKE FUNCTION
         window.likeComment = async function(id, currentLikes) {
-            const { error } = await supabase
-                .from('story_comments')
-                .update({ likes: (currentLikes || 0) + 1 })
-                .eq('id', id);
-            
-            if (error) console.error(error);
-            else loadComments();
+            const { error } = await supabase.from('story_comments').update({ likes: (currentLikes || 0) + 1 }).eq('id', id);
+            if (!error) loadComments();
         };
 
-        // DELETE FUNCTION
         window.deleteThisComment = async function(commentId) {
             if (!confirm("Delete this comment permanently?")) return;
             const { error } = await supabase.from('story_comments').delete().eq('id', commentId);
-            if (error) alert("Database Error: " + error.message);
+            if (error) alert("Error: " + error.message);
             else loadComments();
         };
 
@@ -122,7 +116,6 @@
             const nickname = document.getElementById('nick').value.trim();
             const { error } = await supabase.auth.signUp({ email, password, options: { data: { nickname } } });
             if(error) alert(error.message);
-            else alert("Account created!");
         };
 
         document.getElementById('btn-login-main').onclick = async () => {
@@ -147,22 +140,25 @@
 
         async function loadComments() {
             const box = document.getElementById('comments-box');
+            const countHeader = document.getElementById('comment-count-header');
             const { data: { user } } = await supabase.auth.getUser();
             const { data, error } = await supabase.from('story_comments').select('*').eq('story_id', storyId).order('created_at', { ascending: false });
 
-            if(error) box.textContent = "Error loading comments.";
-            else {
+            if(error) {
+                box.textContent = "Error loading comments.";
+            } else {
+                // Update the Comment Count
+                countHeader.textContent = `💬 ${data.length} ${data.length === 1 ? 'Comment' : 'Comments'}`;
+                
                 box.innerHTML = data.map(c => {
                     const isOwner = user && user.id === c.user_id;
                     const deleteBtn = isOwner ? `<button class="btn-delete" onclick="window.deleteThisComment('${c.id}')">Delete</button>` : '';
-                    
                     const isAdmin = c.nickname === "Rosko"; 
-                    const nameClass = isAdmin ? 'admin-name' : '';
                     const badge = isAdmin ? '<span class="admin-badge">Author</span>' : '';
 
                     return `
                         <div class="comment">
-                            <div class="author ${nameClass}">${c.nickname || 'Guest'}${badge}</div>
+                            <div class="author ${isAdmin ? 'admin-name' : ''}">${c.nickname || 'Guest'}${badge}</div>
                             <div>${c.content}</div>
                             <div class="like-container">
                                 <button class="btn-like" onclick="window.likeComment('${c.id}', ${c.likes || 0})">
