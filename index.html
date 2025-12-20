@@ -75,7 +75,8 @@
                 authUi.classList.add('hidden');
                 commUi.classList.remove('hidden');
                 status.classList.add('hidden');
-                document.getElementById('welcome-msg').textContent = "User: " + (user.user_metadata.nickname || user.email.split('@')[0]);
+                const displayName = user.user_metadata.nickname || user.email.split('@')[0];
+                document.getElementById('welcome-msg').textContent = "User: " + displayName;
             } else {
                 authUi.classList.remove('hidden');
                 commUi.classList.add('hidden');
@@ -85,41 +86,40 @@
             loadComments();
         }
 
-        // SIGNUP FUNCTION
         document.getElementById('btn-signup').onclick = async () => {
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             const nickname = document.getElementById('nick').value.trim() || "Reader";
 
             if (!email || !password) {
-                alert("Please fill in both email and password.");
+                alert("Please fill in email and password.");
                 return;
             }
 
             const { data, error } = await sbClient.auth.signUp({
                 email,
                 password,
-                options: { data: { nickname } }
+                options: { data: { nickname: nickname } }
             });
 
             if (error) {
                 alert("Error: " + error.message);
             } else {
-                alert("Success! You can now Log In.");
+                // Instantly log in after signup
+                await sbClient.auth.signInWithPassword({ email, password });
+                alert("Account created and logged in!");
             }
         };
 
-        // LOGIN FUNCTION
         document.getElementById('btn-login-main').onclick = async () => {
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             const { error } = await sbClient.auth.signInWithPassword({ email, password });
-            if (error) alert(error.message);
+            if (error) alert("Error: " + error.message);
         };
 
         document.getElementById('btn-logout').onclick = (e) => { e.preventDefault(); sbClient.auth.signOut(); };
 
-        // POST COMMENT FUNCTION
         document.getElementById('btn-post').onclick = async () => {
             const content = document.getElementById('msg').value.trim();
             if (!content) return;
@@ -127,15 +127,18 @@
             const { data: { user } } = await sbClient.auth.getUser();
             if (!user) return;
 
+            // Critical Fix: Grab nickname from metadata correctly
+            const userNickname = user.user_metadata.nickname || user.email.split('@')[0];
+
             const { error } = await sbClient.from('story_comments').insert({
-                content, 
+                content: content, 
                 story_id: storyId, 
                 user_id: user.id, 
-                nickname: user.user_metadata.nickname || 'Guest',
+                nickname: userNickname,
                 email: user.email
             });
 
-            if (error) alert(error.message);
+            if (error) alert("Error: " + error.message);
             else { document.getElementById('msg').value = ''; loadComments(); }
         };
 
@@ -163,4 +166,5 @@
 
         init();
     </script>
-    
+</body>
+</html>
