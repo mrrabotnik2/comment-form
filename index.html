@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="bg">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Story Comments</title>
+    <title>Коментари</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -27,25 +27,25 @@
 </head>
 <body>
     <div class="container">
-        <div id="status-bar">Connecting...</div>
+        <div id="status-bar">Свързване...</div>
         <div id="auth-ui">
-            <input type="email" id="email" placeholder="Email">
-            <input type="password" id="password" placeholder="Password">
-            <input type="text" id="nick" placeholder="Display Name">
-            <button id="btn-signup">Create Account</button>
-            <button id="btn-login-main">Log In</button>
+            <input type="email" id="email" placeholder="Имейл">
+            <input type="password" id="password" placeholder="Парола">
+            <input type="text" id="nick" placeholder="Никнейм">
+            <button id="btn-signup">Създай акаунт</button>
+            <button id="btn-login-main">Вход</button>
         </div>
         <div id="comment-ui" class="hidden">
             <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:10px;">
                 <span id="welcome-msg" style="font-weight:bold;"></span>
-                <a href="#" id="btn-logout" style="color: #666; text-decoration: none;">[Log Out]</a>
+                <a href="#" id="btn-logout" style="color: #666; text-decoration: none;">[Изход]</a>
             </div>
-            <textarea id="msg" rows="3" placeholder="Write a comment..."></textarea>
-            <button id="btn-post">Post Comment</button>
+            <textarea id="msg" rows="3" placeholder="Напишете коментар..."></textarea>
+            <button id="btn-post">Публикувай</button>
         </div>
         <div id="list" style="margin-top:20px;">
-            <div id="comment-count-header">Comments (0)</div>
-            <div id="comments-box">Loading...</div>
+            <div id="comment-count-header">Коментари (0)</div>
+            <div id="comments-box">Зареждане...</div>
         </div>
     </div>
 
@@ -78,12 +78,12 @@
                 authUi.classList.add('hidden');
                 commUi.classList.remove('hidden');
                 status.classList.add('hidden');
-                document.getElementById('welcome-msg').textContent = "User: " + (user.user_metadata.nickname || user.email.split('@')[0]);
+                document.getElementById('welcome-msg').textContent = "Потребител: " + (user.user_metadata.nickname || user.email.split('@')[0]);
             } else {
                 authUi.classList.remove('hidden');
                 commUi.classList.add('hidden');
                 status.classList.remove('hidden');
-                status.textContent = "Sign in to leave a comment.";
+                status.textContent = "Влезте, за да оставите коментар.";
             }
             loadComments(); 
         }
@@ -94,7 +94,7 @@
             const nickname = document.getElementById('nick').value.trim();
             const { error } = await sbClient.auth.signUp({ email, password, options: { data: { nickname } } });
             if(error) alert(error.message);
-            else alert("Account created!");
+            else alert("Акаунтът е създаден!");
         };
 
         document.getElementById('btn-login-main').onclick = async () => {
@@ -111,7 +111,7 @@
             if(!content) return;
             const { data: { user } } = await sbClient.auth.getUser();
             const { error } = await sbClient.from('story_comments').insert({
-                content, story_id: storyId, user_id: user.id, nickname: user.user_metadata.nickname || 'Guest'
+                content, story_id: storyId, user_id: user.id, nickname: user.user_metadata.nickname || 'Гост'
             });
             if(error) alert(error.message);
             else { document.getElementById('msg').value = ''; loadComments(); }
@@ -123,22 +123,22 @@
             const { data, error } = await sbClient.from('story_comments').select('*').eq('story_id', storyId).order('created_at', { ascending: false });
 
             if(error) {
-                box.textContent = "Error loading comments.";
+                box.textContent = "Грешка при зареждане.";
             } else {
-                countHeader.textContent = `💬 ${data.length} ${data.length === 1 ? 'Comment' : 'Comments'}`;
+                countHeader.textContent = `💬 ${data.length} ${data.length === 1 ? 'Коментар' : 'Коментара'}`;
                 box.innerHTML = data.map(c => {
                     const isAdmin = c.nickname === "Rosko"; 
-                    const badge = isAdmin ? '<span class="admin-badge">Author</span>' : '';
+                    const badge = isAdmin ? '<span class="admin-badge">Автор</span>' : '';
                     return `
                         <div class="comment">
-                            <div class="author ${isAdmin ? 'admin-name' : ''}">${c.nickname || 'Guest'}${badge}</div>
+                            <div class="author ${isAdmin ? 'admin-name' : ''}">${c.nickname || 'Гост'}${badge}</div>
                             <div>${c.content}</div>
                             <div class="like-container">
                                 <button class="btn-like" onclick="window.likeComment('${c.id}', ${c.likes || 0})">❤️ ${c.likes || 0}</button>
                             </div>
                         </div>
                     `;
-                }).join('') || "No comments yet.";
+                }).join('') || "Все още няма коментари.";
             }
         }
         init();
