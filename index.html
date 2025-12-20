@@ -9,18 +9,17 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: sans-serif; background: #f9f9fb; padding: 10px; }
         .container { max-width: 500px; margin: 20px auto; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        
         input, textarea, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 5px; border: 1px solid #ddd; outline: none; }
         
-        /* Blue Buttons */
+        /* Colors: Blue for Post/Login, Green for Signup */
         button, #btn-login-main { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; }
-        button:hover, #btn-login-main:hover { background: #0056b3; }
-
-        /* Green Button */
+        button:hover { background: #0056b3; }
         #btn-signup { background: #28a745; }
         #btn-signup:hover { background: #218838; }
 
         .comment { border-bottom: 1px solid #eee; padding: 10px 0; font-size: 14px; position: relative; }
-        .author { font-weight: bold; color: #007bff; margin-bottom: 2px; }
+        .author { font-weight: bold; color: #007bff; }
         .hidden { display: none; }
         #status-bar { font-size: 12px; margin-bottom: 10px; color: #666; text-align: center; }
         
@@ -67,19 +66,21 @@
         const supabase = window.supabase.createClient(CONFIG.url, CONFIG.key);
         const storyId = new URLSearchParams(window.location.search).get('story') || 'default';
 
-        // GLOBAL DELETE FUNCTION
-        window.handleDelete = async (id) => {
-            if(!confirm("Are you sure you want to delete this comment?")) return;
-            
+        // --- THE DELETE FUNCTION ---
+        window.deleteThisComment = async function(commentId) {
+            const confirmDelete = confirm("Delete this comment permanently?");
+            if (!confirmDelete) return;
+
             const { error } = await supabase
                 .from('story_comments')
                 .delete()
-                .eq('id', id);
+                .eq('id', commentId);
 
-            if(error) {
-                alert("Delete failed: " + error.message);
+            if (error) {
+                alert("Database Error: " + error.message);
             } else {
-                loadComments();
+                alert("Comment deleted!");
+                loadComments(); // Refresh the list
             }
         };
 
@@ -147,7 +148,7 @@
             else {
                 box.innerHTML = data.map(c => {
                     const isOwner = user && user.id === c.user_id;
-                    const deleteBtn = isOwner ? `<button class="btn-delete" onclick="window.handleDelete('${c.id}')">Delete</button>` : '';
+                    const deleteBtn = isOwner ? `<button class="btn-delete" onclick="window.deleteThisComment('${c.id}')">Delete</button>` : '';
                     return `
                         <div class="comment">
                             <div class="author">${c.nickname || 'Guest'}</div>
