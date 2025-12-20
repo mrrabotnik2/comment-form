@@ -12,34 +12,26 @@
         
         input, textarea, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 5px; border: 1px solid #ddd; outline: none; }
         
-        /* Blue for Post/Login, Green for Signup */
         button, #btn-login-main { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; }
         button:hover { background: #0056b3; }
         #btn-signup { background: #28a745; }
         #btn-signup:hover { background: #218838; }
 
-        .comment { border-bottom: 1px solid #eee; padding: 10px 0; font-size: 14px; position: relative; }
-        .author { font-weight: bold; color: #007bff; }
+        .comment { border-bottom: 1px solid #eee; padding: 12px 0; font-size: 14px; position: relative; }
+        .author { font-weight: bold; color: #007bff; display: inline-block; margin-bottom: 4px; }
         
-        /* Admin Styling */
-        .admin-badge {
-            background: #007bff;
-            color: white;
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 10px;
-            margin-left: 5px;
-            text-transform: uppercase;
-        }
-        .admin-name { color: #1e7e34 !important; } /* Dark Green for Author Name */
+        .admin-badge { background: #007bff; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 5px; text-transform: uppercase; }
+        .admin-name { color: #1e7e34 !important; }
 
         .hidden { display: none; }
         #status-bar { font-size: 12px; margin-bottom: 10px; color: #666; text-align: center; }
         
-        .btn-delete {
-            background: none; color: #ff4d4d; border: none; font-size: 11px; width: auto; 
-            padding: 0; margin: 0; cursor: pointer; position: absolute; right: 0; top: 10px;
-        }
+        /* Like Button Style */
+        .like-container { margin-top: 8px; display: flex; align-items: center; gap: 5px; }
+        .btn-like { background: none; border: 1px solid #ddd; color: #666; font-size: 12px; width: auto; padding: 2px 8px; margin: 0; cursor: pointer; display: inline-flex; align-items: center; }
+        .btn-like:hover { background: #f0f0f0; }
+
+        .btn-delete { background: none; color: #ff4d4d; border: none; font-size: 11px; width: auto; padding: 0; margin: 0; cursor: pointer; position: absolute; right: 0; top: 12px; }
         .btn-delete:hover { text-decoration: underline; }
     </style>
 </head>
@@ -79,6 +71,18 @@
         const supabase = window.supabase.createClient(CONFIG.url, CONFIG.key);
         const storyId = new URLSearchParams(window.location.search).get('story') || 'default';
 
+        // LIKE FUNCTION
+        window.likeComment = async function(id, currentLikes) {
+            const { error } = await supabase
+                .from('story_comments')
+                .update({ likes: (currentLikes || 0) + 1 })
+                .eq('id', id);
+            
+            if (error) console.error(error);
+            else loadComments();
+        };
+
+        // DELETE FUNCTION
         window.deleteThisComment = async function(commentId) {
             if (!confirm("Delete this comment permanently?")) return;
             const { error } = await supabase.from('story_comments').delete().eq('id', commentId);
@@ -138,4 +142,41 @@
                 content, story_id: storyId, user_id: user.id, nickname: user.user_metadata.nickname || 'Guest'
             });
             if(error) alert(error.message);
-            else { document.getElementById('msg').value
+            else { document.getElementById('msg').value = ''; loadComments(); }
+        };
+
+        async function loadComments() {
+            const box = document.getElementById('comments-box');
+            const { data: { user } } = await supabase.auth.getUser();
+            const { data, error } = await supabase.from('story_comments').select('*').eq('story_id', storyId).order('created_at', { ascending: false });
+
+            if(error) box.textContent = "Error loading comments.";
+            else {
+                box.innerHTML = data.map(c => {
+                    const isOwner = user && user.id === c.user_id;
+                    const deleteBtn = isOwner ? `<button class="btn-delete" onclick="window.deleteThisComment('${c.id}')">Delete</button>` : '';
+                    
+                    const isAdmin = c.nickname === "Rosko"; 
+                    const nameClass = isAdmin ? 'admin-name' : '';
+                    const badge = isAdmin ? '<span class="admin-badge">Author</span>' : '';
+
+                    return `
+                        <div class="comment">
+                            <div class="author ${nameClass}">${c.nickname || 'Guest'}${badge}</div>
+                            <div>${c.content}</div>
+                            <div class="like-container">
+                                <button class="btn-like" onclick="window.likeComment('${c.id}', ${c.likes || 0})">
+                                    ❤️ ${c.likes || 0}
+                                </button>
+                            </div>
+                            ${deleteBtn}
+                        </div>
+                    `;
+                }).join('') || "No comments yet.";
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
