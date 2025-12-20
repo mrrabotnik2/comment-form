@@ -12,7 +12,7 @@
         
         input, textarea, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 5px; border: 1px solid #ddd; outline: none; }
         
-        /* Colors: Blue for Post/Login, Green for Signup */
+        /* Blue for Post/Login, Green for Signup */
         button, #btn-login-main { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; }
         button:hover { background: #0056b3; }
         #btn-signup { background: #28a745; }
@@ -66,10 +66,10 @@
         const supabase = window.supabase.createClient(CONFIG.url, CONFIG.key);
         const storyId = new URLSearchParams(window.location.search).get('story') || 'default';
 
-        // --- THE DELETE FUNCTION ---
+        // --- GLOBAL DELETE FUNCTION ---
         window.deleteThisComment = async function(commentId) {
-            const confirmDelete = confirm("Delete this comment permanently?");
-            if (!confirmDelete) return;
+            console.log("Delete triggered for ID:", commentId);
+            if (!confirm("Delete this comment permanently?")) return;
 
             const { error } = await supabase
                 .from('story_comments')
@@ -77,10 +77,10 @@
                 .eq('id', commentId);
 
             if (error) {
+                console.error("Delete Error:", error);
                 alert("Database Error: " + error.message);
             } else {
-                alert("Comment deleted!");
-                loadComments(); // Refresh the list
+                loadComments();
             }
         };
 
