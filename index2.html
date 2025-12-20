@@ -22,14 +22,12 @@
         #status-bar { font-size: 12px; margin-bottom: 10px; color: #666; text-align: center; }
         .like-container { margin-top: 8px; display: flex; align-items: center; gap: 5px; }
         .btn-like { background: none; border: 1px solid #ddd; color: #666; font-size: 12px; width: auto; padding: 2px 8px; cursor: pointer; display: inline-flex; align-items: center; }
-        .btn-delete { background: none; color: #ff4d4d; border: none; font-size: 11px; width: auto; cursor: pointer; position: absolute; right: 0; top: 12px; }
         #comment-count-header { font-size: 15px; display: block; margin-bottom: 10px; border-bottom: 2px solid #f0f0f0; padding-bottom: 5px; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
         <div id="status-bar">Свързване...</div>
-        
         <div id="auth-ui">
             <input type="email" id="email" placeholder="Имейл">
             <input type="password" id="password" placeholder="Парола">
@@ -37,7 +35,6 @@
             <button id="btn-signup">Създай акаунт</button>
             <button id="btn-login-main">Вход</button>
         </div>
-
         <div id="comment-ui" class="hidden">
             <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:10px;">
                 <span id="welcome-msg" style="font-weight:bold;"></span>
@@ -46,7 +43,6 @@
             <textarea id="msg" rows="3" placeholder="Напишете коментар..."></textarea>
             <button id="btn-post">Публикувай</button>
         </div>
-
         <div id="list" style="margin-top:20px;">
             <div id="comment-count-header">Коментари (0)</div>
             <div id="comments-box">Зареждане...</div>
@@ -67,13 +63,6 @@
             if (!error) loadComments();
         };
 
-        window.deleteThisComment = async function(commentId) {
-            if (!confirm("Изтриване на коментара?")) return;
-            const { error } = await sbClient.from('story_comments').delete().eq('id', commentId);
-            if (error) alert("Грешка: " + error.message);
-            else loadComments();
-        };
-
         async function init() {
             const { data: { session } } = await sbClient.auth.getSession();
             updateUI(session?.user);
@@ -85,7 +74,6 @@
             const authUi = document.getElementById('auth-ui');
             const commUi = document.getElementById('comment-ui');
             const status = document.getElementById('status-bar');
-
             if (user) {
                 authUi.classList.add('hidden');
                 commUi.classList.remove('hidden');
@@ -106,7 +94,7 @@
             const nickname = document.getElementById('nick').value.trim();
             const { error } = await sbClient.auth.signUp({ email, password, options: { data: { nickname } } });
             if(error) alert(error.message);
-            else alert("Акаунтът е създаден! Вече можете да влезете.");
+            else alert("Акаунтът е създаден!");
         };
 
         document.getElementById('btn-login-main').onclick = async () => {
@@ -132,7 +120,6 @@
         async function loadComments() {
             const box = document.getElementById('comments-box');
             const countHeader = document.getElementById('comment-count-header');
-            const { data: { user } } = await sbClient.auth.getUser();
             const { data, error } = await sbClient.from('story_comments').select('*').eq('story_id', storyId).order('created_at', { ascending: false });
 
             if(error) {
@@ -140,11 +127,8 @@
             } else {
                 countHeader.textContent = `💬 ${data.length} ${data.length === 1 ? 'Коментар' : 'Коментара'}`;
                 box.innerHTML = data.map(c => {
-                    const isOwner = user && user.id === c.user_id;
-                    const deleteBtn = isOwner ? `<button class="btn-delete" onclick="window.deleteThisComment('${c.id}')">Изтрий</button>` : '';
                     const isAdmin = c.nickname === "Rosko"; 
                     const badge = isAdmin ? '<span class="admin-badge">Автор</span>' : '';
-
                     return `
                         <div class="comment">
                             <div class="author ${isAdmin ? 'admin-name' : ''}">${c.nickname || 'Гост'}${badge}</div>
@@ -152,7 +136,6 @@
                             <div class="like-container">
                                 <button class="btn-like" onclick="window.likeComment('${c.id}', ${c.likes || 0})">❤️ ${c.likes || 0}</button>
                             </div>
-                            ${deleteBtn}
                         </div>
                     `;
                 }).join('') || "Все още няма коментари.";
