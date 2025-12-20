@@ -22,14 +22,12 @@
         #status-bar { font-size: 12px; margin-bottom: 10px; color: #666; text-align: center; }
         .like-container { margin-top: 8px; display: flex; align-items: center; gap: 5px; }
         .btn-like { background: none; border: 1px solid #ddd; color: #666; font-size: 12px; width: auto; padding: 2px 8px; cursor: pointer; display: inline-flex; align-items: center; }
-        .btn-delete { background: none; color: #ff4d4d; border: none; font-size: 11px; width: auto; cursor: pointer; position: absolute; right: 0; top: 12px; }
         #comment-count-header { font-size: 15px; display: block; margin-bottom: 10px; border-bottom: 2px solid #f0f0f0; padding-bottom: 5px; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
         <div id="status-bar">Connecting...</div>
-        
         <div id="auth-ui">
             <input type="email" id="email" placeholder="Email">
             <input type="password" id="password" placeholder="Password">
@@ -37,7 +35,6 @@
             <button id="btn-signup">Create Account</button>
             <button id="btn-login-main">Log In</button>
         </div>
-
         <div id="comment-ui" class="hidden">
             <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:10px;">
                 <span id="welcome-msg" style="font-weight:bold;"></span>
@@ -46,7 +43,6 @@
             <textarea id="msg" rows="3" placeholder="Write a comment..."></textarea>
             <button id="btn-post">Post Comment</button>
         </div>
-
         <div id="list" style="margin-top:20px;">
             <div id="comment-count-header">Comments (0)</div>
             <div id="comments-box">Loading...</div>
@@ -59,20 +55,12 @@
             key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZHpnZHJkZ3Fnc2F5Zm94cWJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NDI1OTcsImV4cCI6MjA4MTIxODU5N30.6sNn3jbNVfl-MEowIEjUknEKHlOcfKvVRa5pFqCHiw0'
         };
 
-        // Renamed to sbClient to avoid global naming conflicts
         const sbClient = window.supabase.createClient(CONFIG.url, CONFIG.key);
         const storyId = new URLSearchParams(window.location.search).get('story') || 'default';
 
         window.likeComment = async function(id, currentLikes) {
             const { error } = await sbClient.from('story_comments').update({ likes: (currentLikes || 0) + 1 }).eq('id', id);
             if (!error) loadComments();
-        };
-
-        window.deleteThisComment = async function(commentId) {
-            if (!confirm("Delete this comment permanently?")) return;
-            const { error } = await sbClient.from('story_comments').delete().eq('id', commentId);
-            if (error) alert("Error: " + error.message);
-            else loadComments();
         };
 
         async function init() {
@@ -86,7 +74,6 @@
             const authUi = document.getElementById('auth-ui');
             const commUi = document.getElementById('comment-ui');
             const status = document.getElementById('status-bar');
-
             if (user) {
                 authUi.classList.add('hidden');
                 commUi.classList.remove('hidden');
@@ -107,7 +94,7 @@
             const nickname = document.getElementById('nick').value.trim();
             const { error } = await sbClient.auth.signUp({ email, password, options: { data: { nickname } } });
             if(error) alert(error.message);
-            else alert("Account created! You can now log in.");
+            else alert("Account created!");
         };
 
         document.getElementById('btn-login-main').onclick = async () => {
@@ -133,20 +120,15 @@
         async function loadComments() {
             const box = document.getElementById('comments-box');
             const countHeader = document.getElementById('comment-count-header');
-            const { data: { user } } = await sbClient.auth.getUser();
             const { data, error } = await sbClient.from('story_comments').select('*').eq('story_id', storyId).order('created_at', { ascending: false });
 
             if(error) {
                 box.textContent = "Error loading comments.";
-                console.error(error);
             } else {
                 countHeader.textContent = `💬 ${data.length} ${data.length === 1 ? 'Comment' : 'Comments'}`;
                 box.innerHTML = data.map(c => {
-                    const isOwner = user && user.id === c.user_id;
-                    const deleteBtn = isOwner ? `<button class="btn-delete" onclick="window.deleteThisComment('${c.id}')">Delete</button>` : '';
                     const isAdmin = c.nickname === "Rosko"; 
                     const badge = isAdmin ? '<span class="admin-badge">Author</span>' : '';
-
                     return `
                         <div class="comment">
                             <div class="author ${isAdmin ? 'admin-name' : ''}">${c.nickname || 'Guest'}${badge}</div>
@@ -154,7 +136,6 @@
                             <div class="like-container">
                                 <button class="btn-like" onclick="window.likeComment('${c.id}', ${c.likes || 0})">❤️ ${c.likes || 0}</button>
                             </div>
-                            ${deleteBtn}
                         </div>
                     `;
                 }).join('') || "No comments yet.";
