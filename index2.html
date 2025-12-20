@@ -20,8 +20,6 @@
         .admin-name { color: #1e7e34 !important; }
         .hidden { display: none; }
         #status-bar { font-size: 12px; margin-bottom: 10px; color: #666; text-align: center; }
-        .like-container { margin-top: 8px; display: flex; align-items: center; gap: 5px; }
-        .btn-like { background: none; border: 1px solid #ddd; color: #666; font-size: 12px; width: auto; padding: 2px 8px; cursor: pointer; display: inline-flex; align-items: center; }
         #comment-count-header { font-size: 15px; display: block; margin-bottom: 10px; border-bottom: 2px solid #f0f0f0; padding-bottom: 5px; font-weight: bold; }
     </style>
 </head>
@@ -54,14 +52,8 @@
             url: 'https://pidzgdrdgqgsayfoxqba.supabase.co',
             key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZHpnZHJkZ3Fnc2F5Zm94cWJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NDI1OTcsImV4cCI6MjA4MTIxODU5N30.6sNn3jbNVfl-MEowIEjUknEKHlOcfKvVRa5pFqCHiw0'
         };
-
         const sbClient = window.supabase.createClient(CONFIG.url, CONFIG.key);
         const storyId = new URLSearchParams(window.location.search).get('story') || 'default';
-
-        window.likeComment = async function(id, currentLikes) {
-            const { error } = await sbClient.from('story_comments').update({ likes: (currentLikes || 0) + 1 }).eq('id', id);
-            if (!error) loadComments();
-        };
 
         async function init() {
             const { data: { session } } = await sbClient.auth.getSession();
@@ -121,7 +113,6 @@
             const box = document.getElementById('comments-box');
             const countHeader = document.getElementById('comment-count-header');
             const { data, error } = await sbClient.from('story_comments').select('*').eq('story_id', storyId).order('created_at', { ascending: false });
-
             if(error) {
                 box.textContent = "Грешка при зареждане.";
             } else {
@@ -133,9 +124,6 @@
                         <div class="comment">
                             <div class="author ${isAdmin ? 'admin-name' : ''}">${c.nickname || 'Гост'}${badge}</div>
                             <div>${c.content}</div>
-                            <div class="like-container">
-                                <button class="btn-like" onclick="window.likeComment('${c.id}', ${c.likes || 0})">❤️ ${c.likes || 0}</button>
-                            </div>
                         </div>
                     `;
                 }).join('') || "Все още няма коментари.";
